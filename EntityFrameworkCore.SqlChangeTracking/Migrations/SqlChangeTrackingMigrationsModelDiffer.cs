@@ -37,6 +37,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
                     yield return enableOperation;
                 }
+                else
+                    yield return migrationOperation;
             }
 
             yield break;

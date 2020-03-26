@@ -43,7 +43,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
     }
 
 
-    public class SqlChangeTrackingMigrationsSqlGeneratorTests : MigrationSqlGeneratorTestBase
+    public class MigrationsSqlGeneratorTests : MigrationSqlGeneratorTestBase
     {
         protected override TestHelpers TestHelpers { get; } = new SqlGeneratorTestHelper();
 
@@ -61,6 +61,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         {
             var builder = new MigrationBuilder("");
 
+            var databaseName = "Fake Database";
+
             var retention = 2;
             var autoCleanUp = true;
             Func<bool, string> autoCleanupString = c => c ? "ON" : "OFF";
@@ -69,7 +71,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
 
             Generate(builder.Operations.ToArray());
 
-            AssertSql($@"ALTER DATABASE ""Fake Database"" SET CHANGE_TRACKING = ON (CHANGE_RETENTION = {retention} DAYS, AUTO_CLEANUP = {autoCleanupString(autoCleanUp)});{Environment.NewLine}");
+            AssertSql($@"ALTER DATABASE ""{databaseName}"" SET CHANGE_TRACKING = ON (CHANGE_RETENTION = {retention} DAYS, AUTO_CLEANUP = {autoCleanupString(autoCleanUp)});{Environment.NewLine}");
 
             builder = new MigrationBuilder("");
 
@@ -80,7 +82,57 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
 
             Generate(builder.Operations.ToArray());
 
-            AssertSql($@"ALTER DATABASE ""Fake Database"" SET CHANGE_TRACKING = ON (CHANGE_RETENTION = {retention} DAYS, AUTO_CLEANUP = {autoCleanupString(autoCleanUp)});{Environment.NewLine}");
+            AssertSql($@"ALTER DATABASE ""{databaseName}"" SET CHANGE_TRACKING = ON (CHANGE_RETENTION = {retention} DAYS, AUTO_CLEANUP = {autoCleanupString(autoCleanUp)});{Environment.NewLine}");
+        }
+
+        [Fact]
+        public void ChangeTrackingDisabledOnDatabase()
+        {
+            var builder = new MigrationBuilder("");
+
+            var databaseName = "Fake Database";
+
+            builder.Operations.Add(new DisableChangeTrackingForDatabaseOperation());
+
+            Generate(builder.Operations.ToArray());
+
+            AssertSql($@"ALTER DATABASE ""{databaseName}"" SET CHANGE_TRACKING = OFF;{Environment.NewLine}");
+        }
+
+        [Fact]
+        public void ChangeTrackingEnabledOnTable()
+        {
+            var builder = new MigrationBuilder("");
+
+            var tableName = "TableName";
+
+            builder.Operations.Add(new EnableChangeTrackingForTableOperation(tableName));
+
+            Generate(builder.Operations.ToArray());
+
+            AssertSql($@"ALTER TABLE ""{tableName}"" ENABLE CHANGE_TRACKING;{Environment.NewLine}");
+
+            builder = new MigrationBuilder("");
+
+            builder.Operations.Add(new EnableChangeTrackingForTableOperation(tableName, null, true));
+
+            Generate(builder.Operations.ToArray());
+
+            AssertSql($@"ALTER TABLE ""{tableName}"" ENABLE CHANGE_TRACKING WITH (TRACK_COLUMNS_UPDATED = ON);{Environment.NewLine}");
+        }
+
+        [Fact]
+        public void ChangeTrackingDisabledOnTable()
+        {
+            var builder = new MigrationBuilder("");
+
+            var tableName = "TableName";
+
+            builder.Operations.Add(new DisableChangeTrackingForTableOperation(tableName));
+
+            Generate(builder.Operations.ToArray());
+
+            AssertSql($@"ALTER TABLE ""{tableName}"" DISABLE CHANGE_TRACKING;{Environment.NewLine}");
         }
     }
 }

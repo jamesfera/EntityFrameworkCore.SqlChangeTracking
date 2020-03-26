@@ -23,7 +23,7 @@ using Xunit;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Tests
 {
-    public class SqlChangeTrackingMigrationsModelDifferTests : MigrationsModelDifferTestBase
+    public class MigrationsModelDifferTests : MigrationsModelDifferTestBase
     {
         class ModelDiffEntity
         {
@@ -51,7 +51,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         //https://github.com/dotnet/efcore/blob/v3.1.2/test/EFCore.SqlServer.Tests/Migrations/SqlServerModelDifferTest.cs
 
         [Fact]
-        public void Diff()
+        public void OperationIsAddedWhenChangeTrackingIsEnableForTable()
         {
             Execute(
                 _ => { },

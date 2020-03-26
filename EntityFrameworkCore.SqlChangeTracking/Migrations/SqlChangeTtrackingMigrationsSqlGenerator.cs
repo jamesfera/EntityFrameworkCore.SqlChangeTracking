@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
@@ -48,35 +49,80 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
         //    }
         //}
 
-        protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
+        void Generate(EnableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            if (operation is EnableChangeTrackingForDatabaseOperation trackingOperation)
-            {
-                var sqlHelper = Dependencies.SqlGenerationHelper;
+            var sqlHelper = Dependencies.SqlGenerationHelper;
 
-                var autoCleanUp = trackingOperation.AutoCleanup ? "ON" : "OFF";
+            var autoCleanUp = operation.AutoCleanup ? "ON" : "OFF";
 
-                builder
-                    .Append("ALTER DATABASE ")
-                    .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
-                    .Append(" SET CHANGE_TRACKING = ON ")
-                    .Append($"(CHANGE_RETENTION = {trackingOperation.RetentionDays} DAYS, AUTO_CLEANUP = {autoCleanUp})")
-                    .AppendLine(sqlHelper.StatementTerminator)
-                    .EndCommand(true);
-
-                //builder
-                //    .Append("ALTER DATABASE ")
-                //    .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
-                //    .Append(" SET CHANGE_TRACKING = OFF ")
-                //    .AppendLine(sqlHelper.StatementTerminator)
-                //    .EndCommand(true);
-            }
-            else
-            {
-                base.Generate(operation, model, builder);
-            }
+            builder
+                .Append("ALTER DATABASE ")
+                .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
+                .Append(" SET CHANGE_TRACKING = ON ")
+                .Append($"(CHANGE_RETENTION = {operation.RetentionDays} DAYS, AUTO_CLEANUP = {autoCleanUp})")
+                .AppendLine(sqlHelper.StatementTerminator)
+                .EndCommand(true);
         }
 
+        void Generate(DisableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
+        {
+            var sqlHelper = Dependencies.SqlGenerationHelper;
+
+            builder
+                .Append("ALTER DATABASE ")
+                .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
+                .Append(" SET CHANGE_TRACKING = OFF")
+                .AppendLine(sqlHelper.StatementTerminator)
+                .EndCommand(true);
+        }
+
+        void Generate(EnableChangeTrackingForTableOperation operation, IModel model, MigrationCommandListBuilder builder)
+        {
+            //TODO detect if operation.TrackColumns has changed and re-create?
+
+            var tableName = operation.Schema == null ? operation.Name : $"{operation.Schema}.{operation.Name}";
+
+            var sqlHelper = Dependencies.SqlGenerationHelper;
+
+            builder
+                .Append("ALTER TABLE ")
+                .Append(sqlHelper.DelimitIdentifier(tableName))
+                .Append(" ENABLE CHANGE_TRACKING");
+
+            if (operation.TrackColumns)
+                builder.Append(" WITH (TRACK_COLUMNS_UPDATED = ON)");
+
+            builder.AppendLine(sqlHelper.StatementTerminator)
+                .EndCommand();
+        }
+
+        void Generate(DisableChangeTrackingForTableOperation operation, IModel model, MigrationCommandListBuilder builder)
+        {
+            var tableName = operation.Schema == null ? operation.Name : $"{operation.Schema}.{operation.Name}";
+
+            var sqlHelper = Dependencies.SqlGenerationHelper;
+
+            builder
+                .Append("ALTER TABLE ")
+                .Append(sqlHelper.DelimitIdentifier(tableName))
+                .Append(" DISABLE CHANGE_TRACKING")
+                .AppendLine(sqlHelper.StatementTerminator)
+                .EndCommand();
+        }
+
+        protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
+        {
+            Action generateAction = operation switch
+            {
+                EnableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
+                DisableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
+                EnableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
+                DisableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
+                _ => () => base.Generate(operation, model, builder)
+            };
+
+            generateAction();
+        }
 
         protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
@@ -88,42 +134,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 base.Generate(operation, model, builder);
                 return;
             }
-
-            var tableName = operation.Schema == null ? operation.Name : $"{operation.Schema}.{operation.Name}";
-
-            var sqlHelper = Dependencies.SqlGenerationHelper;
-
-            void DisableChangeTracking()
-            {
-                builder
-                    .Append("ALTER TABLE ")
-                    .Append(sqlHelper.DelimitIdentifier(tableName))
-                    .Append(" DISABLE CHANGE_TRACKING ")
-                    .AppendLine(sqlHelper.StatementTerminator)
-                    .EndCommand();
-            }
-
-            if (changeTrackingEnabled)
-            {
-                var trackColumns = operation.ChangeTrackingTrackColumns();
-                var oldTrackColumns = changeTrackingWasEnabled && operation.OldTable.ChangeTrackingTrackColumns();
-
-                if (changeTrackingWasEnabled && trackColumns != oldTrackColumns)
-                    DisableChangeTracking();
-
-                builder
-                    .Append("ALTER TABLE ")
-                    .Append(sqlHelper.DelimitIdentifier(tableName))
-                    .Append(" ENABLE CHANGE_TRACKING ");
-
-                if (trackColumns)
-                    builder.Append("WITH (TRACK_COLUMNS_UPDATED = ON)");
-
-                builder.AppendLine(sqlHelper.StatementTerminator)
-                    .EndCommand();
-            }
-            else
-                DisableChangeTracking();
         }
     }
 }
