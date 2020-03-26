@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      with:        
+        fetch-depth: '0'
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
@@ -21,8 +23,6 @@ jobs:
       run: |
         echo mode: Mainline > GitVersion.yml && echo branches: {} >> GitVersion.yml && echo ignore: >> GitVersion.yml && echo '  sha: []' >> GitVersion.yml
         dotnet tool install -g dotnet-setversion && dotnet tool install -g GitVersion.Tool
-        git fetch --unshallow
-        dotnet-gitversion -showvariable NugetVersionV2
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
       run: dotnet build --configuration Release
@@ -30,7 +30,7 @@ jobs:
       run: dotnet test --configuration Release --no-build
     - name: Create nuget package
       run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --no-build
-    - name: Push to NuGet
-      run: dotnet nuget push **/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+    # - name: Push to NuGet
+    #   run: dotnet nuget push **/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
 
       
