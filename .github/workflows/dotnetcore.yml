@@ -30,7 +30,7 @@ jobs:
       run: |
         cd ./EntityFrameworkCore.SqlChangeTracking.Tests/
         dotnet add package coverlet.msbuild
-        dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build
+        dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build --configuration Release
     - name: Publish coverage report to coveralls.io
       uses: coverallsapp/github-action@v1.0.1
       with:
