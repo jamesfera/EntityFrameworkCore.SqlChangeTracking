@@ -3,8 +3,6 @@ name: .NET Core
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
 
 jobs:
   build:
@@ -14,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:        
-        fetch-depth: '0'
+        fetch-depth: 0
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
@@ -28,8 +26,18 @@ jobs:
       run: dotnet build --configuration Release
     - name: Test with dotnet
       run: dotnet test --configuration Release --no-build
-    - name: Create nuget package
-      run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --no-build
+    - name: Generate coverage report
+      run: |
+        cd ./EntityFrameworkCore.SqlChangeTracking.Tests/
+        dotnet add package coverlet.msbuild
+        dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build
+    - name: Publish coverage report to coveralls.io
+      uses: coverallsapp/github-action@v1.0.1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path-to-lcov: ./EntityFrameworkCore.SqlChangeTracking.Tests/coverage.info   
+    # - name: Create nuget package
+    #   run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --no-build
     # - name: Push to NuGet
     #   run: dotnet nuget push **/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
 
