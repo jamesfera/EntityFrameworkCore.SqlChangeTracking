@@ -24,6 +24,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             builder.ReplaceService<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();
             builder.ReplaceService<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
+            builder.ReplaceService<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
 
             return sqlBuilder;
         }

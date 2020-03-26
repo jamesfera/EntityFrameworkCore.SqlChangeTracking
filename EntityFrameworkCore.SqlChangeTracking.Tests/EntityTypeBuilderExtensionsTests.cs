@@ -19,7 +19,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
             serviceProvider = new ServiceCollection()
                 // You can also use InMemory or any other provider here to get the provider-specific conventions
                 .AddEntityFrameworkInMemoryDatabase()
-                .AddDbContext<TestContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString()))
+                .AddDbContext<TestContext>()
                 .BuildServiceProvider();
 
         }
@@ -39,47 +39,39 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
     {
         public bool ColumnTracking { get; }
 
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString());
+            base.OnConfiguring(optionsBuilder);
+        }
+
         public TestContext(bool columnTracking = false)
         {
             ColumnTracking = columnTracking;
         }
 
         public DbSet<TestEntity> Entities { get; set;}
+    }
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        {
-            //base.OnConfiguring(optionsBuilder);
-
-            optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString());
-        }
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            //base.OnModelCreating(modelBuilder);
-
-            //modelBuilder.Entity<TestEntity>().WithSqlChangeTracking(ColumnTracking);
-        }
-
-        public class TestEntity
-        {
-            public int Id { get; set; }
-        }
+    public class TestEntity
+    {
+        public int Id { get; set; }
     }
 
 
 
-    public class EntityTypeBuilderTests
+    public class EntityTypeBuilderExtensionsTests
     {
         [Fact]
         public void MetadataIsProperlySet_WhenTrackColumnsOff()
         {
             var builder = services.GetModelBuilder();
 
-            builder.Entity<TestContext.TestEntity>().WithSqlChangeTracking(false);
+            builder.Entity<TestEntity>().WithSqlChangeTracking(false);
 
             var model = builder.FinalizeModel();
 
-            var testEntityType = model.FindEntityType(typeof(TestContext.TestEntity));
+            var testEntityType = model.FindEntityType(typeof(TestEntity));
 
             Assert.True(testEntityType.IsSqlChangeTrackingEnabled());
             Assert.False(testEntityType.GetTrackColumns());
@@ -90,11 +82,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         {
             var builder = services.GetModelBuilder();
 
-            builder.Entity<TestContext.TestEntity>().WithSqlChangeTracking(true);
+            builder.Entity<TestEntity>().WithSqlChangeTracking(true);
 
             var model = builder.FinalizeModel();
 
-            var testEntityType = model.FindEntityType(typeof(TestContext.TestEntity));
+            var testEntityType = model.FindEntityType(typeof(TestEntity));
 
             Assert.True(testEntityType.IsSqlChangeTrackingEnabled());
             Assert.True(testEntityType.GetTrackColumns());

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
+using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -47,43 +48,35 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
         //    }
         //}
 
-        protected override void Generate(AlterDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
+        protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            var changeTrackingEnabled = operation.IsChangeTrackingEnabled();
-            var changeTrackingWasEnabled = operation.OldDatabase.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false;
-
-            if (!changeTrackingEnabled && !changeTrackingWasEnabled)
+            if (operation is EnableChangeTrackingForDatabaseOperation trackingOperation)
             {
-                base.Generate(operation, model, builder);
-                return;
-            }
+                var sqlHelper = Dependencies.SqlGenerationHelper;
 
-            var sqlHelper = Dependencies.SqlGenerationHelper;
-
-            if (changeTrackingEnabled)
-            {
-                var autoCleanUp = operation.ChangeTrackingAutoCleanUp() ? "ON" : "OFF";
-
-                //TODO enable changing of autocleanup and retention parameters
+                var autoCleanUp = trackingOperation.AutoCleanup ? "ON" : "OFF";
 
                 builder
                     .Append("ALTER DATABASE ")
                     .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
                     .Append(" SET CHANGE_TRACKING = ON ")
-                    .Append($"(CHANGE_RETENTION = {operation.ChangeTrackingRetentionDays()} DAYS, AUTO_CLEANUP = {autoCleanUp})")
+                    .Append($"(CHANGE_RETENTION = {trackingOperation.RetentionDays} DAYS, AUTO_CLEANUP = {autoCleanUp})")
                     .AppendLine(sqlHelper.StatementTerminator)
                     .EndCommand(true);
+
+                //builder
+                //    .Append("ALTER DATABASE ")
+                //    .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
+                //    .Append(" SET CHANGE_TRACKING = OFF ")
+                //    .AppendLine(sqlHelper.StatementTerminator)
+                //    .EndCommand(true);
             }
             else
             {
-                builder
-                    .Append("ALTER DATABASE ")
-                    .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
-                    .Append(" SET CHANGE_TRACKING = OFF ")
-                    .AppendLine(sqlHelper.StatementTerminator)
-                    .EndCommand(true);
+                base.Generate(operation, model, builder);
             }
         }
+
 
         protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
         {

@@ -14,12 +14,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
         {
             return (int) operation.FindAnnotation(SqlChangeTrackingAnnotationNames.ChangeRetentionDays).Value;
         }
-
         public static bool ChangeTrackingAutoCleanUp(this AlterDatabaseOperation operation)
         {
             return (bool)operation.FindAnnotation(SqlChangeTrackingAnnotationNames.AutoCleanup).Value;
         }
-
         public static bool IsChangeTrackingEnabled(this TableOperation operation)
             => operation.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false;
 
