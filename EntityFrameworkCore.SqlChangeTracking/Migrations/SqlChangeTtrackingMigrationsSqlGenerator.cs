@@ -64,6 +64,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
             {
                 var autoCleanUp = operation.ChangeTrackingAutoCleanUp() ? "ON" : "OFF";
 
+                //TODO enable changing of autocleanup and retention parameters
+
                 builder
                     .Append("ALTER DATABASE ")
                     .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))

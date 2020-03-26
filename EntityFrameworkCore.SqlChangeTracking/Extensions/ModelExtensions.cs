@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking
@@ -22,5 +23,12 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
         public static void SetChangeRetentionDays(this IMutableModel model, int days = 2)
             => model.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.ChangeRetentionDays, days);
+
+        public static IMutableEntityType SafeAddEntityType(this IMutableModel model, Type entityType)
+        {
+            var mutableEntityType = model.FindEntityType(entityType) ?? model.AddEntityType(entityType);
+
+            return mutableEntityType;
+        }
     }
 }

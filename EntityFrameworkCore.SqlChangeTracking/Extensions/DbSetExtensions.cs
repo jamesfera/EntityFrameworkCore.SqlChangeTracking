@@ -85,7 +85,11 @@ namespace EntityFrameworkCore.SqlChangeTracking
             {
                 var columnName = entityType.GetProperties().First(p => p.Name == propertyInfo.Name).GetColumnName();
 
-                propertyInfo.SetValue(entity, reader[columnName]);
+                object? readerValue = reader[columnName];
+
+                readerValue = readerValue == DBNull.Value ? null : readerValue;
+
+                propertyInfo.SetValue(entity, readerValue);
             }
 
             return entry;
