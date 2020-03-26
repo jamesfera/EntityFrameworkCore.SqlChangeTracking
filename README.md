@@ -1,3 +1,3 @@
 # EntityFrameworkCore.SqlChangeTracking
 
-![](https://github.com/jamesfera/EntityFrameworkCore.SqlChangeTracking/workflows/.NET%20Core/badge.svg)
+![](https://github.com/jamesfera/EntityFrameworkCore.SqlChangeTracking/workflows/.github/workflows/dotnetcore.yml/badge.svg)
