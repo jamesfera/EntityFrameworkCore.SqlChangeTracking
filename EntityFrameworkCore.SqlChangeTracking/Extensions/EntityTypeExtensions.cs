@@ -21,7 +21,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
         public static bool GetTrackColumns(this IEntityType entityType)
             => entityType[SqlChangeTrackingAnnotationNames.TrackColumns] as bool? ?? false;
 
-        public static void SetTrackColumns(this IMutableEntityType entityType, bool enabled = true)
+        public static void SetTrackColumns(this IMutableEntityType entityType, bool enabled = false)
             => entityType.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.TrackColumns, enabled);
 
         public static string[] GetColumnNames(this IEntityType entityType)

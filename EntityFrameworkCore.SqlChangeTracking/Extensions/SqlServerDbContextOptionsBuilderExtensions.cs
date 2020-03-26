@@ -28,19 +28,4 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return sqlBuilder;
         }
     }
-
-    public class Exten : IDbContextOptionsExtension
-    {
-        public void ApplyServices(IServiceCollection services)
-        {
-            
-        }
-
-        public void Validate(IDbContextOptions options)
-        {
-            
-        }
-
-        public DbContextOptionsExtensionInfo Info { get; }
-    }
 }
