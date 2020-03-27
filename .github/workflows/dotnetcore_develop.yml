@@ -7,7 +7,7 @@ on:
 jobs:
   build:
 
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
@@ -22,8 +22,6 @@ jobs:
         echo mode: Mainline > GitVersion.yml && echo branches: {} >> GitVersion.yml && echo ignore: >> GitVersion.yml && echo '  sha: []' >> GitVersion.yml
         dotnet tool install -g dotnet-setversion && dotnet tool install -g GitVersion.Tool
         git fetch --no-tags --prune origin +refs/heads/master:refs/remotes/origin/master
-        git checkout develop
-        dotnet-gitversion -showvariable NugetVersionV2
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
       run: |
@@ -44,6 +42,6 @@ jobs:
     - name: Push to NuGet
       run: |
         dotnet nuget add source https://nuget.pkg.github.com/jamesfera/index.json --name "GPR"
-        dotnet nuget push **/*.nupkg -s "GPR" -k ${{ secrets.GITHUB_TOKEN }}
+        nuget push **/*.nupkg -Source "GPR" -ApiKey ${{ secrets.GITHUB_TOKEN }} -NonInteractive 
 
       
