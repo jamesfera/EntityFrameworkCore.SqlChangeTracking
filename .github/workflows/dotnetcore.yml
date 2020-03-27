@@ -24,7 +24,7 @@ jobs:
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
       run: |
-        dotnet add  .\EntityFrameworkCore.SqlChangeTracking\ package Microsoft.SourceLink.GitHub
+        dotnet add ./EntityFrameworkCore.SqlChangeTracking/ package Microsoft.SourceLink.GitHub
         dotnet build --configuration Release
     - name: Test with dotnet
       run: |
