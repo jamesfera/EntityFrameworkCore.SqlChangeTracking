@@ -22,7 +22,6 @@ jobs:
         echo mode: Mainline > GitVersion.yml && echo branches: {} >> GitVersion.yml && echo ignore: >> GitVersion.yml && echo '  sha: []' >> GitVersion.yml
         dotnet tool install -g dotnet-setversion && dotnet tool install -g GitVersion.Tool
         git fetch --no-tags --prune origin +refs/heads/master:refs/remotes/origin/master
-        dotnet-gitversion -showvariable NugetVersionV2
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
       run: |
@@ -32,7 +31,7 @@ jobs:
       run: |
         cd ./EntityFrameworkCore.SqlChangeTracking.Tests/
         dotnet add package coverlet.msbuild
-        dotnet test --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-buil
+        dotnet test --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build
     - name: Publish coverage report to coveralls.io
       uses: coverallsapp/github-action@v1.0.1
       with:
