@@ -23,21 +23,21 @@ jobs:
         dotnet tool install -g dotnet-setversion && dotnet tool install -g GitVersion.Tool
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
-      run: dotnet build --configuration Release
+      run: |
+        dotnet add  .\EntityFrameworkCore.SqlChangeTracking\ package Microsoft.SourceLink.GitHub
+        dotnet build --configuration Release
     - name: Test with dotnet
-      run: dotnet test --configuration Release --no-build
-    - name: Generate coverage report
       run: |
         cd ./EntityFrameworkCore.SqlChangeTracking.Tests/
         dotnet add package coverlet.msbuild
-        dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build --configuration Release
+        dotnet test --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build
     - name: Publish coverage report to coveralls.io
       uses: coverallsapp/github-action@v1.0.1
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         path-to-lcov: ./EntityFrameworkCore.SqlChangeTracking.Tests/coverage.info   
     - name: Create nuget package
-      run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --no-build
+      run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true --no-build
     - name: Push to NuGet
       run: dotnet nuget push **/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
 
