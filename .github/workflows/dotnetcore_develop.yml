@@ -7,7 +7,7 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v2
@@ -41,7 +41,7 @@ jobs:
       run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true --no-build
     - name: Push to NuGet
       run: |
-        dotnet nuget add source https://nuget.pkg.github.com/jamesfera/index.json --name "GPR" --username jamesfera --password ${{ secrets.GITHUB_TOKEN }}
+        dotnet nuget add source https://nuget.pkg.github.com/jamesfera/index.json --name "GPR"
         dotnet nuget push **/*.nupkg -s "GPR" -k ${{ secrets.GITHUB_TOKEN }}
 
       
