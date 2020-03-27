@@ -14,41 +14,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
     public class SqlChangeTrackingMigrationsSqlGenerator : SqlServerMigrationsSqlGenerator
     {
         public SqlChangeTrackingMigrationsSqlGenerator(MigrationsSqlGeneratorDependencies dependencies, IMigrationsAnnotationProvider migrationsAnnotations) : base(dependencies, migrationsAnnotations) { }
-
-        //protected override void Generate(AlterDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
-        //{
-        //    var serviceBrokerEnabled = operation.IsServiceBrokerEnabled();
-        //    var serviceBrokerWasEnabled = operation.OldDatabase.FindAnnotation(SyncEngineAnnotationNames.ServiceBroker)?.Value as bool? ?? false;
-
-        //    if (!serviceBrokerEnabled && !serviceBrokerWasEnabled)
-        //    {
-        //        base.Generate(operation, model, builder);
-        //        return;
-        //    }
-
-        //    var sqlHelper = Dependencies.SqlGenerationHelper;
-        //    var database = Dependencies.CurrentContext.Context.Database.GetDbConnection().Database;
-
-        //    if (serviceBrokerEnabled)
-        //    {
-        //        builder
-        //            .Append("ALTER DATABASE ")
-        //            .Append(sqlHelper.DelimitIdentifier(database))
-        //            .Append(" SET ALLOW_SNAPSHOT_ISOLATION ON ")
-        //            .AppendLine(sqlHelper.StatementTerminator)
-        //            .EndCommand();
-        //    }
-        //    else
-        //    {
-        //        builder
-        //            .Append("ALTER DATABASE ")
-        //            .Append(sqlHelper.DelimitIdentifier(database))
-        //            .Append(" SET ALLOW_SNAPSHOT_ISOLATION OFF ")
-        //            .AppendLine(sqlHelper.StatementTerminator)
-        //            .EndCommand();
-        //    }
-        //}
-
+        
         void Generate(EnableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
             var sqlHelper = Dependencies.SqlGenerationHelper;
@@ -110,18 +76,43 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 .EndCommand();
         }
 
-        protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
+        protected override void Generate(AlterDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            Action generateAction = operation switch
-            {
-                EnableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
-                DisableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
-                EnableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
-                DisableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
-                _ => () => base.Generate(operation, model, builder)
-            };
+            var changeTrackingEnabled = operation.IsChangeTrackingEnabled();
+            var changeTrackingWasEnabled = operation.OldDatabase.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false;
 
-            generateAction();
+            if (!changeTrackingEnabled && !changeTrackingWasEnabled)
+            {
+                base.Generate(operation, model, builder);
+                return;
+            }
+
+            var sqlHelper = Dependencies.SqlGenerationHelper;
+            var database = Dependencies.CurrentContext.Context.Database.GetDbConnection().Database;
+
+            if (changeTrackingEnabled)
+                Generate(new EnableChangeTrackingForDatabaseOperation(operation.ChangeTrackingRetentionDays(), operation.ChangeTrackingAutoCleanUp()), model, builder);
+            else
+                Generate(new DisableChangeTrackingForDatabaseOperation(), model, builder);
+
+            //if (serviceBrokerEnabled)
+            //{
+            //    builder
+            //        .Append("ALTER DATABASE ")
+            //        .Append(sqlHelper.DelimitIdentifier(database))
+            //        .Append(" SET ALLOW_SNAPSHOT_ISOLATION ON ")
+            //        .AppendLine(sqlHelper.StatementTerminator)
+            //        .EndCommand();
+            //}
+            //else
+            //{
+            //    builder
+            //        .Append("ALTER DATABASE ")
+            //        .Append(sqlHelper.DelimitIdentifier(database))
+            //        .Append(" SET ALLOW_SNAPSHOT_ISOLATION OFF ")
+            //        .AppendLine(sqlHelper.StatementTerminator)
+            //        .EndCommand();
+            //}
         }
 
         protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
@@ -134,6 +125,25 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 base.Generate(operation, model, builder);
                 return;
             }
+
+            if (changeTrackingEnabled)
+                Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
+            else
+                Generate(new DisableChangeTrackingForTableOperation(operation.Name, operation.Schema), model, builder);
+        }
+
+        protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
+        {
+            Action generateAction = operation switch
+            {
+                EnableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
+                DisableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
+                EnableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
+                DisableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
+                _ => () => base.Generate(operation, model, builder)
+            };
+
+            generateAction();
         }
     }
 }

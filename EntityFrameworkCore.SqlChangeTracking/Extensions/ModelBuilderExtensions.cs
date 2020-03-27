@@ -15,6 +15,5 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             return modelBuilder;
         }
-
     }
 }

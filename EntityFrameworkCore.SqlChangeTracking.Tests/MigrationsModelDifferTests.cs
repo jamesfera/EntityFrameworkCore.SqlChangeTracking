@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Migrations;
 using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
@@ -9,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Internal;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
@@ -30,13 +32,46 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
             public int Id { get; set; }
         }
 
+        public string DatabaseName { get; } = "Fake Database";
+
+        protected static string EOL => Environment.NewLine;
+        protected virtual string Sql { get; set; }
+        protected virtual void Generate(params MigrationOperation[] operation)
+            => Generate(_ => { }, operation);
+
+        protected virtual void Generate(Action<ModelBuilder> buildAction, params MigrationOperation[] operation)
+        {
+            var modelBuilder = TestHelpers.CreateConventionBuilder();
+            modelBuilder.Model.RemoveAnnotation(CoreAnnotationNames.ProductVersion);
+            buildAction(modelBuilder);
+
+            var batch = TestHelpers.CreateContextServices().GetRequiredService<IMigrationsSqlGenerator>()
+                .Generate(operation, modelBuilder.Model);
+
+            Sql = string.Join(
+                "GO" + EOL + EOL,
+                batch.Select(b => b.CommandText));
+        }
+
+        protected void AssertSql(string expected)
+            => Assert.Equal(expected, Sql, ignoreLineEndingDifferences: true);
+
         protected override IMigrationsModelDiffer CreateModelDiffer(DbContextOptions options)
         {
             var context = TestHelpers.CreateContext(options);
 
-            var serviceProvider = TestHelpers.CreateContextServices();
+            //var serviceProvider = TestHelpers.CreateContextServices();
 
-            return  new SqlChangeTrackingMigrationsModelDiffer(
+            //return  new SqlChangeTrackingMigrationsModelDiffer(
+            //    new TestRelationalTypeMappingSource(
+            //        TestServiceFactory.Instance.Create<TypeMappingSourceDependencies>(),
+            //        TestServiceFactory.Instance.Create<RelationalTypeMappingSourceDependencies>()),
+            //    new SqlChangeTrackingMigrationsAnnotationProvider(new MigrationsAnnotationProviderDependencies()),
+            //    context.GetService<IChangeDetector>(),
+            //    context.GetService<IUpdateAdapterFactory>(),
+            //    context.GetService<CommandBatchPreparerDependencies>());
+
+            return new MigrationsModelDiffer(
                 new TestRelationalTypeMappingSource(
                     TestServiceFactory.Instance.Create<TypeMappingSourceDependencies>(),
                     TestServiceFactory.Instance.Create<RelationalTypeMappingSourceDependencies>()),
@@ -44,14 +79,71 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
                 context.GetService<IChangeDetector>(),
                 context.GetService<IUpdateAdapterFactory>(),
                 context.GetService<CommandBatchPreparerDependencies>());
-         
+
         }
+
+        protected override TestHelpers TestHelpers { get; } = new RelationalTestHelpers(s =>
+        {
+            s.AddScoped<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
+            s.AddScoped<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
+            s.AddScoped<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();
+        });
 
         //see for examples:
         //https://github.com/dotnet/efcore/blob/v3.1.2/test/EFCore.SqlServer.Tests/Migrations/SqlServerModelDifferTest.cs
 
         [Fact]
-        public void OperationIsAddedWhenChangeTrackingIsEnableForTable()
+        public void SqlGeneratedWhenChangeTrackingEnabledForDatabase()
+        {
+            Execute(
+                _ => { },
+                source => { },
+                target => target.ConfigureChangeTracking(true, 5, false),
+                upOps =>
+                {
+                    var migrationOperation = Assert.Single(upOps);
+
+                    Generate(migrationOperation);
+
+                    AssertSql($@"ALTER DATABASE ""{DatabaseName}"" SET CHANGE_TRACKING = ON (CHANGE_RETENTION = {5} DAYS, AUTO_CLEANUP = OFF);{Environment.NewLine}");
+                },
+                downOps => { });
+        }
+
+        [Fact]
+        public void SqlGeneratedWhenChangeTrackingDisabledForDatabase()
+        {
+            Execute(
+                _ => { },
+                source => source.ConfigureChangeTracking(),
+                target => { },
+                upOps =>
+                {
+                    var migrationOperation = Assert.Single(upOps);
+
+                    Generate(migrationOperation);
+
+                    AssertSql($@"ALTER DATABASE ""{DatabaseName}"" SET CHANGE_TRACKING = OFF;{Environment.NewLine}");
+                },
+                downOps => { });
+        }
+
+        //[Fact]
+        //public void NoOperationWhenModelIsUnchanged()
+        //{
+        //    Execute(
+        //        _ => { },
+        //        source => source.ConfigureChangeTracking(),
+        //        target => target.ConfigureChangeTracking(),
+        //        upOps =>
+        //        {
+        //            Assert.Empty(upOps);
+        //        },
+        //        downOps => { });
+        //}
+
+        [Fact]
+        public void SqlGeneratedWhenChangeTrackingEnabledForTable()
         {
             Execute(
                 _ => { },
@@ -59,24 +151,47 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
                 target => target.Entity<ModelDiffEntity>().WithSqlChangeTracking(),
                 upOps =>
                 {
-                    Assert.Equal(1, upOps.Count);
+                    var migrationOperation = Assert.Single(upOps);
 
-                    var operation = upOps[0];
-
-                    var changeOperation = Assert.IsType<EnableChangeTrackingForTableOperation>(operation);
-
-                    Assert.False(changeOperation.TrackColumns);
+                    Generate(migrationOperation);
+                    
+                    AssertSql($@"ALTER TABLE ""{nameof(ModelDiffEntity)}"" ENABLE CHANGE_TRACKING;{Environment.NewLine}");
                 },
-                downOps =>
-                {
+                downOps => { });
 
-                });
+            Execute(
+                _ => { },
+                source => source.Entity<ModelDiffEntity>(),
+                target => target.Entity<ModelDiffEntity>().WithSqlChangeTracking(true),
+                upOps =>
+                {
+                    var migrationOperation = Assert.Single(upOps);
+
+                    Generate(migrationOperation);
+
+                    AssertSql($@"ALTER TABLE ""{nameof(ModelDiffEntity)}"" ENABLE CHANGE_TRACKING WITH (TRACK_COLUMNS_UPDATED = ON);{Environment.NewLine}");
+                },
+                downOps => { });
         }
 
-        protected override TestHelpers TestHelpers { get; } = new RelationalTestHelpers(s =>
+        [Fact]
+        public void SqlGeneratedWhenChangeTrackingDisabledForTable()
         {
-            s.AddScoped<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
-            s.AddScoped<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
-        });
+            Execute(
+                _ => { },
+                source => source.Entity<ModelDiffEntity>().WithSqlChangeTracking(),
+                target => target.Entity<ModelDiffEntity>(),
+                upOps =>
+                {
+                    var migrationOperation = Assert.Single(upOps);
+
+                    Generate(migrationOperation);
+
+                    AssertSql($@"ALTER TABLE ""{nameof(ModelDiffEntity)}"" DISABLE CHANGE_TRACKING;{Environment.NewLine}");
+                },
+                downOps => { });
+        }
+
+
     }
 }

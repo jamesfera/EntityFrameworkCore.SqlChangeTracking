@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.Linq;
 using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Internal;
@@ -31,11 +33,36 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
             
             foreach (var migrationOperation in operations)
             {
-                if (migrationOperation is TableOperation ctOperation && ctOperation.IsChangeTrackingEnabled())
+                if (migrationOperation is AlterTableOperation tableOperation)
                 {
-                    var enableOperation = new EnableChangeTrackingForTableOperation(target.Name, target.Schema);
+                    if(tableOperation.IsChangeTrackingEnabled())
+                        yield return new EnableChangeTrackingForTableOperation(target.Name, target.Schema, tableOperation.ChangeTrackingTrackColumns());
+                    else if (tableOperation.OldTable.IsChangeTrackingEnabled())
+                        yield return new DisableChangeTrackingForTableOperation(target.Name, target.Schema);
+                    else
+                        yield return migrationOperation;
+                }
+                else
+                    yield return migrationOperation;
+            }
 
-                    yield return enableOperation;
+            yield break;
+        }
+        
+        protected override IEnumerable<MigrationOperation> Diff(IModel source, IModel target, DiffContext diffContext)
+        {
+            var operations = base.Diff(source, target, diffContext);
+
+            foreach (var migrationOperation in operations)
+            {
+                if (migrationOperation is AlterDatabaseOperation dbOperation)
+                {
+                    if(dbOperation.IsChangeTrackingEnabled())
+                        yield return new EnableChangeTrackingForDatabaseOperation(dbOperation.ChangeTrackingRetentionDays(), dbOperation.ChangeTrackingAutoCleanUp());
+                    else if(dbOperation.OldDatabase.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false)
+                        yield return new DisableChangeTrackingForDatabaseOperation();
+                    else
+                        yield return migrationOperation;
                 }
                 else
                     yield return migrationOperation;

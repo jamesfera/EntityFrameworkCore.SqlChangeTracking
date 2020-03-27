@@ -62,34 +62,34 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
 
     public class EntityTypeBuilderExtensionsTests
     {
-        [Fact]
-        public void MetadataIsProperlySet_WhenTrackColumnsOff()
-        {
-            var builder = services.GetModelBuilder();
+        //[Fact]
+        //public void MetadataIsProperlySet_WhenTrackColumnsOff()
+        //{
+        //    var builder = services.GetModelBuilder();
 
-            builder.Entity<TestEntity>().WithSqlChangeTracking(false);
+        //    builder.Entity<TestEntity>().WithSqlChangeTracking(false);
 
-            var model = builder.FinalizeModel();
+        //    var model = builder.FinalizeModel();
 
-            var testEntityType = model.FindEntityType(typeof(TestEntity));
+        //    var testEntityType = model.FindEntityType(typeof(TestEntity));
 
-            Assert.True(testEntityType.IsSqlChangeTrackingEnabled());
-            Assert.False(testEntityType.GetTrackColumns());
-        }
+        //    Assert.True(testEntityType.IsSqlChangeTrackingEnabled());
+        //    Assert.False(testEntityType.GetTrackColumns());
+        //}
 
-        [Fact]
-        public void MetadataIsProperlySet_WhenTrackColumnsOn()
-        {
-            var builder = services.GetModelBuilder();
+        //[Fact]
+        //public void MetadataIsProperlySet_WhenTrackColumnsOn()
+        //{
+        //    var builder = services.GetModelBuilder();
 
-            builder.Entity<TestEntity>().WithSqlChangeTracking(true);
+        //    builder.Entity<TestEntity>().WithSqlChangeTracking(true);
 
-            var model = builder.FinalizeModel();
+        //    var model = builder.FinalizeModel();
 
-            var testEntityType = model.FindEntityType(typeof(TestEntity));
+        //    var testEntityType = model.FindEntityType(typeof(TestEntity));
 
-            Assert.True(testEntityType.IsSqlChangeTrackingEnabled());
-            Assert.True(testEntityType.GetTrackColumns());
-        }
+        //    Assert.True(testEntityType.IsSqlChangeTrackingEnabled());
+        //    Assert.True(testEntityType.GetTrackColumns());
+        //}
     }
 }
