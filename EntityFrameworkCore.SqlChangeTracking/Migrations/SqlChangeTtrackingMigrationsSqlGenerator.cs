@@ -115,6 +115,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
             //}
         }
 
+        protected override void Generate(CreateTableOperation operation, IModel model, MigrationCommandListBuilder builder, bool terminate = true)
+        {
+           base.Generate(operation, model, builder);
+
+           if (operation.IsChangeTrackingEnabled())
+               Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
+        }
+
         protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
             var changeTrackingEnabled = operation.IsChangeTrackingEnabled();
@@ -125,7 +133,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 base.Generate(operation, model, builder);
                 return;
             }
-
+            
             if (changeTrackingEnabled)
                 Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
             else

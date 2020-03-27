@@ -45,8 +45,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 else
                     yield return migrationOperation;
             }
-
-            yield break;
         }
         
         protected override IEnumerable<MigrationOperation> Diff(IModel source, IModel target, DiffContext diffContext)
@@ -67,8 +65,24 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 else
                     yield return migrationOperation;
             }
+        }
 
-            yield break;
+        protected override IEnumerable<MigrationOperation> Add(TableMapping target, DiffContext diffContext)
+        {
+            var operations = base.Add(target, diffContext);
+
+            foreach (var migrationOperation in operations)
+            {
+                if (migrationOperation is CreateTableOperation tableOperation)
+                {
+                    yield return migrationOperation;
+
+                    if (tableOperation.IsChangeTrackingEnabled())
+                        yield return new EnableChangeTrackingForTableOperation(target.Name, target.Schema, tableOperation.ChangeTrackingTrackColumns());
+                }
+                else
+                    yield return migrationOperation;
+            }
         }
     }
 }

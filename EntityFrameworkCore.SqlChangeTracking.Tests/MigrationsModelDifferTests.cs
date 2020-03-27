@@ -3,21 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Migrations;
-using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Internal;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
-using Microsoft.EntityFrameworkCore.SqlServer.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.EntityFrameworkCore.TestUtilities.FakeProvider;
 using Microsoft.EntityFrameworkCore.Update;
 using Microsoft.EntityFrameworkCore.Update.Internal;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,14 +56,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
 
             //var serviceProvider = TestHelpers.CreateContextServices();
 
-            //return  new SqlChangeTrackingMigrationsModelDiffer(
-            //    new TestRelationalTypeMappingSource(
-            //        TestServiceFactory.Instance.Create<TypeMappingSourceDependencies>(),
-            //        TestServiceFactory.Instance.Create<RelationalTypeMappingSourceDependencies>()),
-            //    new SqlChangeTrackingMigrationsAnnotationProvider(new MigrationsAnnotationProviderDependencies()),
-            //    context.GetService<IChangeDetector>(),
-            //    context.GetService<IUpdateAdapterFactory>(),
-            //    context.GetService<CommandBatchPreparerDependencies>());
+            return new SqlChangeTrackingMigrationsModelDiffer(
+                new TestRelationalTypeMappingSource(
+                    TestServiceFactory.Instance.Create<TypeMappingSourceDependencies>(),
+                    TestServiceFactory.Instance.Create<RelationalTypeMappingSourceDependencies>()),
+                new SqlChangeTrackingMigrationsAnnotationProvider(new MigrationsAnnotationProviderDependencies()),
+                context.GetService<IChangeDetector>(),
+                context.GetService<IUpdateAdapterFactory>(),
+                context.GetService<CommandBatchPreparerDependencies>());
 
             return new MigrationsModelDiffer(
                 new TestRelationalTypeMappingSource(
@@ -128,20 +122,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
                 downOps => { });
         }
 
-        //[Fact]
-        //public void NoOperationWhenModelIsUnchanged()
-        //{
-        //    Execute(
-        //        _ => { },
-        //        source => source.ConfigureChangeTracking(),
-        //        target => target.ConfigureChangeTracking(),
-        //        upOps =>
-        //        {
-        //            Assert.Empty(upOps);
-        //        },
-        //        downOps => { });
-        //}
-
         [Fact]
         public void SqlGeneratedWhenChangeTrackingEnabledForTable()
         {
@@ -170,6 +150,26 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
                     Generate(migrationOperation);
 
                     AssertSql($@"ALTER TABLE ""{nameof(ModelDiffEntity)}"" ENABLE CHANGE_TRACKING WITH (TRACK_COLUMNS_UPDATED = ON);{Environment.NewLine}");
+                },
+                downOps => { });
+        }
+
+        [Fact]
+        public void SqlGeneratedWhenChangeTrackingEnabledForNewTable()
+        {
+            Execute(
+                _ => { },
+                source => { },
+                target => target.Entity<ModelDiffEntity>().WithSqlChangeTracking(),
+                upOps =>
+                {
+                    Generate(upOps.ToArray());
+
+                    var expectedSql = $@"ALTER TABLE ""{nameof(ModelDiffEntity)}"" ENABLE CHANGE_TRACKING;{Environment.NewLine}";
+
+                    Assert.Contains("CREATE TABLE", Sql);
+
+                    Assert.EndsWith(expectedSql, Sql);
                 },
                 downOps => { });
         }
