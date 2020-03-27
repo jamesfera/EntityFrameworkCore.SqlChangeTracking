@@ -45,6 +45,8 @@ jobs:
     - name: Create nuget package
       run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true --no-build
     - name: Push to NuGet
-      run: nuget push **/*.nupkg -Source https://nuget.pkg.github.com/jamesfera/index.json -ApiKey ${{ secrets.GITHUB_TOKEN }} -NonInteractive 
+      run: |
+        nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }}
+        nuget push **/*.nupkg -Source "GPR"
 
       
