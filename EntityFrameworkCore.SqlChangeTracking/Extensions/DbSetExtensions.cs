@@ -37,16 +37,9 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return result.IsEnabled == "TRUE";
         }
 
-        public static void WithChangeTrackingContext<T>(this DbSet<T> dbSet, string trackingContext) where T : class
+        public static IDisposable WithTrackingContext<T>(this DbSet<T> dbSet, string trackingContext) where T : class
         {
-            var bytes = Encoding.UTF8.GetBytes(trackingContext);
-            var context = dbSet.GetService<ICurrentDbContext>().Context;
-
-            
-            //dbSet.a
-            //var changeContextTracker = dbSet.GetService<IChangeTrackingContext>();
-
-            //changeContextTracker.SetContextFor<T>(trackingContext);
+            return new TrackingContextAsyncLocalCache.ChangeTrackingContext(trackingContext);
         }
 
         internal static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext dbContext, IEntityType entityType, long version) where T : class, new()
@@ -194,7 +187,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
         private static object Private(this object obj, string privateField) => obj?.GetType().GetField(privateField, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(obj);
         private static T Private<T>(this object obj, string privateField) => (T)obj?.GetType().GetField(privateField, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(obj);
 
-        public static RelationalDataReader ExecuteSqlQuery(this DatabaseFacade databaseFacade, string sql, params object[] parameters)
+        internal static RelationalDataReader ExecuteSqlQuery(this DatabaseFacade databaseFacade, string sql, params object[] parameters)
         {
             var concurrencyDetector = databaseFacade.GetService<IConcurrencyDetector>();
 

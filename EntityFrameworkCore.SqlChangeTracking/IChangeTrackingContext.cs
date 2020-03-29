@@ -1,32 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace EntityFrameworkCore.SqlChangeTracking
 {
-    public interface IChangeTrackingContext
+    public interface IChangeTrackingContext : IDisposable
     {
-
-        void SetContextFor<T>(string context) where T : class;
-
-        string GetContextFor<T>() where T : class;
+        string TrackingContext { get; }
     }
 
-    public class ChangeTrackingContext : IChangeTrackingContext
+    internal static class TrackingContextAsyncLocalCache
     {
-        Dictionary<Type, string> _contextDictionary = new Dictionary<Type, string>();
+        static readonly AsyncLocal<ChangeTrackingContext?> AsyncLocalContext = new AsyncLocal<ChangeTrackingContext?>();
 
-        public void SetContextFor<T>(string context) where T : class
+        public static string CurrentTrackingContext => AsyncLocalContext.Value?.TrackingContext;
+
+        public class ChangeTrackingContext : IChangeTrackingContext
         {
-            if (!_contextDictionary.ContainsKey(typeof(T)))
-                _contextDictionary.Add(typeof(T), context);
-        }
+            public ChangeTrackingContext(string context)
+            {
+                if(string.IsNullOrWhiteSpace(context))
+                    return;
 
-        public string GetContextFor<T>() where T : class
-        {
-            _contextDictionary.TryGetValue(typeof(T), out string value);
+                TrackingContext = context;
+                AsyncLocalContext.Value = this;
+            }
 
-            return value;
+            public void Dispose()
+            {
+                AsyncLocalContext.Value = null;
+                //return new ValueTask();
+            }
+
+            public string TrackingContext { get; }
         }
     }
+    
 }
