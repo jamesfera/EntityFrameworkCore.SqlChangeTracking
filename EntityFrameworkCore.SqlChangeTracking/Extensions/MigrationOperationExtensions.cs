@@ -11,13 +11,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
             => operation.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false;
 
         public static int ChangeTrackingRetentionDays(this AlterDatabaseOperation operation)
-        {
-            return (int) operation.FindAnnotation(SqlChangeTrackingAnnotationNames.ChangeRetentionDays).Value;
-        }
+            => (int) operation.FindAnnotation(SqlChangeTrackingAnnotationNames.ChangeRetentionDays).Value;
+        
         public static bool ChangeTrackingAutoCleanUp(this AlterDatabaseOperation operation)
-        {
-            return (bool)operation.FindAnnotation(SqlChangeTrackingAnnotationNames.AutoCleanup).Value;
-        }
+            => (bool)operation.FindAnnotation(SqlChangeTrackingAnnotationNames.AutoCleanup).Value;
+        public static bool IsSnapshotIsolationEnabled(this AlterDatabaseOperation operation)
+            => operation.FindAnnotation(SqlChangeTrackingAnnotationNames.SnapshotIsolation)?.Value as bool? ?? false;
+
         public static bool IsChangeTrackingEnabled(this TableOperation operation)
             => operation.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false;
 
