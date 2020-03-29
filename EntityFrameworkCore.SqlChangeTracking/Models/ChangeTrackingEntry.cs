@@ -2,7 +2,7 @@
 
 namespace EntityFrameworkCore.SqlChangeTracking.Models
 {
-    public enum ChangeOperation { Insert, Update, Delete }
+    public enum ChangeOperation { None, Insert, Update, Delete }
     public class ChangeTrackingEntry<T> : ChangeTrackingEntry
     {
         public T Entity { get; }
@@ -13,7 +13,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
     public class ChangeTrackingEntry
     {
         //[Column("SYS_CHANGE_VERSION")]
-        public long ChangeVersion { get; set; }
+        public long? ChangeVersion { get; set; }
         //[Column("SYS_CHANGE_CREATION_VERSION")]
         public long? CreationVersion { get; set; }
         //[Column("SYS_CHANGE_OPERATION")]

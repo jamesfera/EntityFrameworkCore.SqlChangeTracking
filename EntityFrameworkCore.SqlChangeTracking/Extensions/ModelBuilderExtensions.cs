@@ -9,10 +9,13 @@ namespace EntityFrameworkCore.SqlChangeTracking
         public static ModelBuilder ConfigureChangeTracking(this ModelBuilder modelBuilder, bool enableSnapshotIsolation = true, int retentionDays = 2, bool autoCleanUp = true)
         {
             modelBuilder.Model.SetChangeTrackingEnabled(true);
-            modelBuilder.Model.SetSnapshotIsolationEnabled(true);
+
+            if(enableSnapshotIsolation) 
+                modelBuilder.Model.SetSnapshotIsolationEnabled();
+
             modelBuilder.Model.SetChangeTrackingRetentionDays(retentionDays);
             modelBuilder.Model.SetChangeTrackingAutoCleanupEnabled(autoCleanUp);
-
+            
             return modelBuilder;
         }
     }

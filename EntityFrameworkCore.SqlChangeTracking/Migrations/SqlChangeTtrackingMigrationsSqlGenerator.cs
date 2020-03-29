@@ -30,6 +30,25 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 .EndCommand(true);
         }
 
+        void Generate(EnableSnapshotIsolationOperation operation, IModel model, MigrationCommandListBuilder builder)
+        {
+            var sqlHelper = Dependencies.SqlGenerationHelper;
+
+            builder
+                .Append("ALTER DATABASE ")
+                .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
+                .Append(" SET ALLOW_SNAPSHOT_ISOLATION ON ")
+                .AppendLine(sqlHelper.StatementTerminator)
+                .EndCommand();
+
+            //    builder
+            //        .Append("ALTER DATABASE ")
+            //        .Append(sqlHelper.DelimitIdentifier(database))
+            //        .Append(" SET ALLOW_SNAPSHOT_ISOLATION OFF ")
+            //        .AppendLine(sqlHelper.StatementTerminator)
+            //        .EndCommand();
+        }
+
         void Generate(DisableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
             var sqlHelper = Dependencies.SqlGenerationHelper;
@@ -78,41 +97,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
         protected override void Generate(AlterDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            var changeTrackingEnabled = operation.IsChangeTrackingEnabled();
-            var changeTrackingWasEnabled = operation.OldDatabase.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false;
+            base.Generate(operation, model, builder);
 
-            if (!changeTrackingEnabled && !changeTrackingWasEnabled)
-            {
-                base.Generate(operation, model, builder);
-                return;
-            }
-
-            var sqlHelper = Dependencies.SqlGenerationHelper;
-            var database = Dependencies.CurrentContext.Context.Database.GetDbConnection().Database;
-
-            if (changeTrackingEnabled)
+            if (operation.IsChangeTrackingEnabled())
                 Generate(new EnableChangeTrackingForDatabaseOperation(operation.ChangeTrackingRetentionDays(), operation.ChangeTrackingAutoCleanUp()), model, builder);
-            else
+            else if(operation.OldDatabase.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false)
                 Generate(new DisableChangeTrackingForDatabaseOperation(), model, builder);
-
-            //if (serviceBrokerEnabled)
-            //{
-            //    builder
-            //        .Append("ALTER DATABASE ")
-            //        .Append(sqlHelper.DelimitIdentifier(database))
-            //        .Append(" SET ALLOW_SNAPSHOT_ISOLATION ON ")
-            //        .AppendLine(sqlHelper.StatementTerminator)
-            //        .EndCommand();
-            //}
-            //else
-            //{
-            //    builder
-            //        .Append("ALTER DATABASE ")
-            //        .Append(sqlHelper.DelimitIdentifier(database))
-            //        .Append(" SET ALLOW_SNAPSHOT_ISOLATION OFF ")
-            //        .AppendLine(sqlHelper.StatementTerminator)
-            //        .EndCommand();
-            //}
         }
 
         protected override void Generate(CreateTableOperation operation, IModel model, MigrationCommandListBuilder builder, bool terminate = true)
@@ -125,18 +115,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
         protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            var changeTrackingEnabled = operation.IsChangeTrackingEnabled();
-            var changeTrackingWasEnabled = operation.OldTable.IsChangeTrackingEnabled();
+            base.Generate(operation, model, builder);
 
-            if (!changeTrackingEnabled && !changeTrackingWasEnabled)
-            {
-                base.Generate(operation, model, builder);
-                return;
-            }
-            
-            if (changeTrackingEnabled)
+            if (operation.IsChangeTrackingEnabled())
                 Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
-            else
+            else if(operation.OldTable.IsChangeTrackingEnabled())
                 Generate(new DisableChangeTrackingForTableOperation(operation.Name, operation.Schema), model, builder);
         }
 
@@ -148,6 +131,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 DisableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
                 EnableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
                 DisableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
+                EnableSnapshotIsolationOperation op => () => Generate(op, model, builder),
                 _ => () => base.Generate(operation, model, builder)
             };
 

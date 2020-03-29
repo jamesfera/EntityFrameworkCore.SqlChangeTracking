@@ -123,6 +123,24 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         }
 
         [Fact]
+        public void SqlGeneratedWhenSnapshotIsolationEnabled()
+        {
+            Execute(
+                _ => { },
+                source => source.ConfigureChangeTracking(),
+                target => { },
+                upOps =>
+                {
+                    var migrationOperation = Assert.Single(upOps);
+
+                    Generate(migrationOperation);
+
+                    AssertSql($@"ALTER DATABASE ""{DatabaseName}"" SET CHANGE_TRACKING = OFF;{Environment.NewLine}");
+                },
+                downOps => { });
+        }
+
+        [Fact]
         public void SqlGeneratedWhenChangeTrackingEnabledForTable()
         {
             Execute(

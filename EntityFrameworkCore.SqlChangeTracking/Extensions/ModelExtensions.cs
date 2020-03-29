@@ -15,8 +15,8 @@ namespace EntityFrameworkCore.SqlChangeTracking
         public static bool IsSnapshotIsolationEnabled(this IModel model)
             => model[SqlChangeTrackingAnnotationNames.SnapshotIsolation] as bool? ?? false;
 
-        public static void SetSnapshotIsolationEnabled(this IMutableModel model, bool enabled)
-            => model.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.SnapshotIsolation, enabled);
+        public static void SetSnapshotIsolationEnabled(this IMutableModel model)
+            => model.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.SnapshotIsolation, true);
 
         public static bool GetChangeTrackingAutoCleanupEnabled(this IModel model)
             => model[SqlChangeTrackingAnnotationNames.AutoCleanup] as bool? ?? false;

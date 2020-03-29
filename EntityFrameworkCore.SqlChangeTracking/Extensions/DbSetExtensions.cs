@@ -5,6 +5,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -21,22 +22,45 @@ namespace EntityFrameworkCore.SqlChangeTracking
         private const string EntityTablePrefix = "T";
         private const string ChangeTablePrefix = "CT";
 
-        public static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbSet<T> dbSet, long version) where T : class, new()
+        public static bool IsChangeTrackingEnabled<T>(this DbSet<T> dbSet) where T : class
         {
-            //TODO Handle deletes
-
-            Validate(dbSet);
-
             var context = dbSet.GetService<ICurrentDbContext>().Context;
 
             var entityType = context.Model.FindEntityType(typeof(T));
 
             var tableName = entityType.GetTableName();
 
+            var sql = $"select ISNULL((SELECT cast('TRUE' as varchar(5))  FROM sys.change_tracking_tables where object_id = OBJECT_ID('{tableName}')),'FALSE')  as IsEnabled";
+
+            var result = context.SqlQuery(() => new { IsEnabled = "" }, sql).First();
+
+            return result.IsEnabled == "TRUE";
+        }
+
+        public static void WithChangeTrackingContext<T>(this DbSet<T> dbSet, string trackingContext) where T : class
+        {
+            var bytes = Encoding.UTF8.GetBytes(trackingContext);
+            var context = dbSet.GetService<ICurrentDbContext>().Context;
+
+            
+            //dbSet.a
+            //var changeContextTracker = dbSet.GetService<IChangeTrackingContext>();
+
+            //changeContextTracker.SetContextFor<T>(trackingContext);
+        }
+
+        internal static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext dbContext, IEntityType entityType, long version) where T : class, new()
+        {
+            //TODO Handle deletes
+
+            Validate(entityType);
+
+            var context = dbContext.GetService<ICurrentDbContext>().Context;
+
+            var tableName = entityType.GetTableName();
+
             var primaryKey = entityType.FindPrimaryKey();
 
-            //var primaryKeyColumn = primaryKey.Properties.Select(p => p.GetColumnName()).First();
-            
             var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Select(c => $"{EntityTablePrefix}.{c}"));
 
             prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
@@ -45,21 +69,69 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             var joinKeyStatement = string.Join(" AND ", pks);
 
-            //SET TRANSACTION ISOLATION LEVEL SNAPSHOT;
-            //BEGIN TRAN
+            var sqlBuilder = new StringBuilder();
 
-            var q = $"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} RIGHT OUTER JOIN CHANGETABLE(CHANGES {tableName}, {version}) AS {ChangeTablePrefix} ON {joinKeyStatement}";
+            if (context.Model.IsSnapshotIsolationEnabled())
+                sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
 
-            var reader = context.Database.ExecuteSqlQuery(q).DbDataReader;
+            sqlBuilder.AppendLine("BEGIN TRAN");
 
-            List<ChangeTrackingEntry<T>> results = new List<ChangeTrackingEntry<T>>();
+            sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} RIGHT OUTER JOIN CHANGETABLE(CHANGES {tableName}, {version}) AS {ChangeTablePrefix} ON {joinKeyStatement}");
+
+            sqlBuilder.AppendLine("COMMIT TRAN");
+
+            var reader = context.Database.ExecuteSqlQuery(sqlBuilder.ToString()).DbDataReader;
 
             while (reader.Read())
-            {
-                results.Add(mapToChangeTrackingEntry<T>(reader, entityType));
-            }
+                yield return mapToChangeTrackingEntry<T>(reader, entityType);
+        }
 
-            return results.AsEnumerable();
+        public static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbSet<T> dbSet, long version) where T : class, new()
+        {
+            var context = dbSet.GetService<ICurrentDbContext>().Context;
+
+            var entityType = context.Model.FindEntityType(typeof(T));
+        
+            return GetChangesSinceVersion<T>(context, entityType, version);
+        }
+
+        public static IEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet, long version) where T : class, new()
+        {
+            //TODO Handle deletes
+
+            var context = dbSet.GetService<ICurrentDbContext>().Context;
+
+            var entityType = context.Model.FindEntityType(typeof(T));
+
+            Validate(entityType);
+
+            var tableName = entityType.GetTableName();
+
+            var primaryKey = entityType.FindPrimaryKey();
+
+            var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Select(c => $"{EntityTablePrefix}.{c}"));
+
+            prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
+
+            var pks = primaryKey.Properties.Select(pk => $"{EntityTablePrefix}.{pk.GetColumnName()} = {ChangeTablePrefix}.{pk.GetColumnName()}");
+
+            var joinKeyStatement = string.Join(" AND ", pks);
+
+            var sqlBuilder = new StringBuilder();
+
+            if (context.Model.IsSnapshotIsolationEnabled())
+                sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
+
+            sqlBuilder.AppendLine("BEGIN TRAN");
+
+            sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} LEFT OUTER JOIN CHANGETABLE(CHANGES {tableName}, null) AS {ChangeTablePrefix} ON {joinKeyStatement}");
+
+            sqlBuilder.AppendLine("COMMIT TRAN");
+
+            var reader = context.Database.ExecuteSqlQuery(sqlBuilder.ToString()).DbDataReader;
+
+            while (reader.Read())
+                yield return mapToChangeTrackingEntry<T>(reader, entityType);
         }
 
         private static ChangeTrackingEntry<T> mapToChangeTrackingEntry<T>(DbDataReader reader, IEntityType entityType) where T : class, new()
@@ -67,18 +139,20 @@ namespace EntityFrameworkCore.SqlChangeTracking
             var entity = new T();
             var entry = new ChangeTrackingEntry<T>(entity);
 
-            entry.ChangeContext = reader[nameof(ChangeTrackingEntry<T>.ChangeContext)] as string;
-            entry.ChangeVersion = (long)reader[nameof(ChangeTrackingEntry<T>.ChangeVersion)];
+            var byteArray = reader[nameof(ChangeTrackingEntry<T>.ChangeContext)] as byte[];
+
+            entry.ChangeContext = byteArray == null ? null : Encoding.UTF8.GetString(byteArray);
+            entry.ChangeVersion = reader[nameof(ChangeTrackingEntry<T>.ChangeVersion)] as long?;
             entry.CreationVersion = reader[nameof(ChangeTrackingEntry<T>.CreationVersion)] as long?;
 
-            var operation = (string) reader[nameof(ChangeTrackingEntry<T>.ChangeOperation)];
+            var operation = reader[nameof(ChangeTrackingEntry<T>.ChangeOperation)] as string;
 
             entry.ChangeOperation = operation switch
                 {
                     "I" => ChangeOperation.Insert,
                     "U" => ChangeOperation.Update,
                     "D" => ChangeOperation.Delete,
-                    _ => throw new Exception()
+                    _ => ChangeOperation.None
                 };
 
             foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
@@ -95,16 +169,12 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return entry;
         }
 
-        private static void Validate<T>(DbSet<T> dbSet) where T : class
+        private static void Validate(IEntityType entityType)
         {
-            var context = dbSet.GetService<ICurrentDbContext>().Context;
-
-            var entityType = context.Model.FindEntityType(typeof(T));
-            
             var changeTrackingEnabled = entityType.IsSqlChangeTrackingEnabled();
 
             if(!changeTrackingEnabled)
-                throw new ArgumentException($"Change tracking is not enabled for Entity: '{entityType.Name}'. Call '.WithSqlChangeTracking()' at Entity build time.");
+                throw new ArgumentException($"Change tracking is not enabled for Entity: '{entityType.Name}'. Call '.{nameof(EntityTypeBuilderExtensions.WithSqlChangeTracking)}()' at Entity build time.");
         }
 
         public static string ToSql<TEntity>(this IQueryable<TEntity> query) where TEntity : class

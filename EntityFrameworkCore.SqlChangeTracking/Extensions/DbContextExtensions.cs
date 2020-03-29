@@ -10,6 +10,19 @@ namespace EntityFrameworkCore.SqlChangeTracking
 {
     public static class DbContextExtensions
     {
+        public static bool IsSnapshotIsolationEnabled<TContext>(this TContext dbContext) where TContext : DbContext
+        {
+            var sql =
+                $"SELECT snapshot_isolation_state_desc from sys.databases where name = '{dbContext.Database.GetDbConnection().Database}'";
+
+            var result = dbContext.SqlQuery(() => new {snapshot_isolation_state_desc = ""}, sql).FirstOrDefault();
+
+            return result?.snapshot_isolation_state_desc == "ON";
+        }
+    }
+
+    internal static class InternalDbContextExtensions
+    { 
         public static IList<T> SqlQuery<T>(this DbContext db, Func<T> targetType, string sql, params object[] parameters) where T : class
         {
             return SqlQuery<T>(db, sql, parameters);
@@ -40,31 +53,16 @@ namespace EntityFrameworkCore.SqlChangeTracking
             }
             protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
-                var type = typeof(T);
-
-                addTypeToModel(type, modelBuilder);
-
-                //if (type.IsGenericType)
-                //{
-                //    foreach (var genericArgument in type.GetGenericArguments())
-                //    {
-                //        addTypeToModel(genericArgument, modelBuilder);
-                //    }
-                //}
-
-                base.OnModelCreating(modelBuilder);
-            }
-
-            private void addTypeToModel(Type typeToAdd, ModelBuilder modelBuilder)
-            {
-                var t = modelBuilder.Entity(typeToAdd).HasNoKey();
+                var t = modelBuilder.Entity<T>().HasNoKey();
 
                 //to support anonymous types, configure entity properties for read-only properties
-                foreach (var prop in typeToAdd.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+                foreach (var prop in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
                 {
                     if (prop.CustomAttributes.All(a => a.AttributeType != typeof(NotMappedAttribute)))
                         t.Property(prop.Name);
                 }
+
+                base.OnModelCreating(modelBuilder);
             }
         }
     }
