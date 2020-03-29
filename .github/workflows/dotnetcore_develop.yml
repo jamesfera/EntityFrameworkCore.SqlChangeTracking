@@ -30,6 +30,7 @@ jobs:
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
       run: |
+        nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }}
         dotnet add ./EntityFrameworkCore.SqlChangeTracking/ package Microsoft.SourceLink.GitHub
         dotnet build --configuration Release
     - name: Test with dotnet
@@ -44,9 +45,7 @@ jobs:
         path-to-lcov: ./EntityFrameworkCore.SqlChangeTracking.Tests/coverage.info   
     - name: Create nuget package
       run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true --no-build
-    - name: Push to NuGet
-      run: |
-        nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }}
-        nuget push **/*.nupkg -Source "GPR"
+    - name: Push to GitHub NuGet
+      run: nuget push **/*.nupkg -Source "GPR" -ApiKey ${{ secrets.GITHUB_TOKEN }}
 
       
