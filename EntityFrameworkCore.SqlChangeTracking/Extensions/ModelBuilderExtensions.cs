@@ -6,17 +6,28 @@ namespace EntityFrameworkCore.SqlChangeTracking
 {
     public static class ModelBuilderExtensions
     {
-        public static ModelBuilder ConfigureChangeTracking(this ModelBuilder modelBuilder, bool enableSnapshotIsolation = true, int retentionDays = 2, bool autoCleanUp = true)
+        public static ModelBuilder ConfigureChangeTracking(this ModelBuilder modelBuilder, Action<ChangeTrackingConfigurationBuilder>? configBuilderAction = null)
         {
-            modelBuilder.Model.SetChangeTrackingEnabled(true);
+            var configBuilder = new ChangeTrackingConfigurationBuilder();
 
-            if(enableSnapshotIsolation) 
-                modelBuilder.Model.SetSnapshotIsolationEnabled();
+            configBuilderAction?.Invoke(configBuilder);
+            
+            modelBuilder.Model.EnableChangeTracking();
 
-            modelBuilder.Model.SetChangeTrackingRetentionDays(retentionDays);
-            modelBuilder.Model.SetChangeTrackingAutoCleanupEnabled(autoCleanUp);
+            if(configBuilder.EnableSnapshotIsolation) 
+                modelBuilder.Model.EnableSnapshotIsolation();
+
+            modelBuilder.Model.SetChangeTrackingRetentionDays(configBuilder.RetentionDays);
+            modelBuilder.Model.SetChangeTrackingAutoCleanupEnabled(configBuilder.AutoCleanUp);
             
             return modelBuilder;
         }
+    }
+
+    public class ChangeTrackingConfigurationBuilder
+    {
+        public bool EnableSnapshotIsolation { get; set; } = true;
+        public int RetentionDays { get; set; } = 2;
+        public bool AutoCleanUp { get; set; } = true;
     }
 }

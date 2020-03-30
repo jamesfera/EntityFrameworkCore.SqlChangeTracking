@@ -16,7 +16,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
         {
             //entityTypeBuilder.Metadata.Model.SetSnapshotIsolationEnabled(true);
 
-            entityTypeBuilder.Metadata.SetSqlChangeTrackingEnabled(true);
+            entityTypeBuilder.Metadata.EnableSqlChangeTracking();
             entityTypeBuilder.Metadata.SetTrackColumns(trackColumns);
 
             return entityTypeBuilder;

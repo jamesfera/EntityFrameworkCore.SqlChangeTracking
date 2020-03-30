@@ -92,7 +92,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
             Execute(
                 _ => { },
                 source => { },
-                target => target.ConfigureChangeTracking(false, 5, false),
+                target => target.ConfigureChangeTracking(c =>
+                {
+                    c.EnableSnapshotIsolation = false;
+                    c.RetentionDays = 5;
+                    c.AutoCleanUp = false;
+                }),
                 upOps =>
                 {
                     var migrationOperation = Assert.Single(upOps);
@@ -128,7 +133,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
             Execute(
                 _ => { },
                 source => { },
-                target => target.Model.SetSnapshotIsolationEnabled(),
+                target => target.Model.EnableSnapshotIsolation(),
                 upOps =>
                 {
                     var migrationOperation = Assert.Single(upOps);

@@ -6,19 +6,19 @@ namespace EntityFrameworkCore.SqlChangeTracking
 {
     public static class ModelExtensions
     {
-        public static bool GetChangeTrackingEnabled(this IModel model)
+        public static bool IsChangeTrackingEnabled(this IModel model)
             => model[SqlChangeTrackingAnnotationNames.Enabled] as bool? ?? false;
 
-        public static void SetChangeTrackingEnabled(this IMutableModel model, bool enabled)
-            => model.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.Enabled, enabled);
+        public static void EnableChangeTracking(this IMutableModel model)
+            => model.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.Enabled, true);
 
         public static bool IsSnapshotIsolationEnabled(this IModel model)
             => model[SqlChangeTrackingAnnotationNames.SnapshotIsolation] as bool? ?? false;
 
-        public static void SetSnapshotIsolationEnabled(this IMutableModel model)
+        public static void EnableSnapshotIsolation(this IMutableModel model)
             => model.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.SnapshotIsolation, true);
 
-        public static bool GetChangeTrackingAutoCleanupEnabled(this IModel model)
+        public static bool IsChangeTrackingAutoCleanupEnabled(this IModel model)
             => model[SqlChangeTrackingAnnotationNames.AutoCleanup] as bool? ?? false;
 
         public static void SetChangeTrackingAutoCleanupEnabled(this IMutableModel model, bool enabled)

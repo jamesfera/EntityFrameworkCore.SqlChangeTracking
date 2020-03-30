@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Dynamic;
@@ -13,6 +14,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace EntityFrameworkCore.SqlChangeTracking
@@ -22,33 +24,47 @@ namespace EntityFrameworkCore.SqlChangeTracking
         private const string EntityTablePrefix = "T";
         private const string ChangeTablePrefix = "CT";
 
-        public static bool IsChangeTrackingEnabled<T>(this DbSet<T> dbSet) where T : class
+        public interface ICurrentTrackingContext
         {
-            var context = dbSet.GetService<ICurrentDbContext>().Context;
+            string GetTrackingContextForTable(string tableName);
+        }
 
-            var entityType = context.Model.FindEntityType(typeof(T));
+        public interface ICurrentContextSetter
+        {
+            void SetContextForTable(string tableName, string trackingContext);
+        }
 
-            var tableName = entityType.GetTableName();
+        public class CurrentTrackingContext : ICurrentTrackingContext, ICurrentContextSetter
+        {
+            ConcurrentDictionary<string, string> _contextCache = new ConcurrentDictionary<string, string>();
 
-            var sql = $"select ISNULL((SELECT cast('TRUE' as varchar(5))  FROM sys.change_tracking_tables where object_id = OBJECT_ID('{tableName}')),'FALSE')  as IsEnabled";
+            public string GetTrackingContextForTable(string tableName)
+            {
+                _contextCache.TryGetValue(tableName, out string trackingContext);
 
-            var result = context.SqlQuery(() => new { IsEnabled = "" }, sql).First();
+                return trackingContext;
+            }
 
-            return result.IsEnabled == "TRUE";
+            public void SetContextForTable(string tableName, string trackingContext)
+            {
+                _contextCache.TryAdd(tableName, trackingContext);
+            }
         }
 
         public static IDisposable WithTrackingContext<T>(this DbSet<T> dbSet, string trackingContext) where T : class
         {
-            return new TrackingContextAsyncLocalCache.ChangeTrackingContext(trackingContext);
+            var context = dbSet.GetService<ICurrentDbContext>().Context;
+            
+            var tableName = context.Model.FindEntityType(typeof(T)).GetTableName();
+
+            return new TrackingContextAsyncLocalCache.ChangeTrackingContext(tableName, trackingContext);
         }
 
-        internal static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext dbContext, IEntityType entityType, long version) where T : class, new()
+        internal static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
         {
             //TODO Handle deletes
 
             Validate(entityType);
-
-            var context = dbContext.GetService<ICurrentDbContext>().Context;
 
             var tableName = entityType.GetTableName();
 
@@ -69,7 +85,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             sqlBuilder.AppendLine("BEGIN TRAN");
 
-            sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} RIGHT OUTER JOIN CHANGETABLE(CHANGES {tableName}, {version}) AS {ChangeTablePrefix} ON {joinKeyStatement}");
+            sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} RIGHT OUTER JOIN CHANGETABLE(CHANGES {tableName}, {version}) AS {ChangeTablePrefix} ON {joinKeyStatement} ORDER BY ChangeVersion");
 
             sqlBuilder.AppendLine("COMMIT TRAN");
 

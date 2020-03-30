@@ -39,7 +39,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
                 .Append(" SET ALLOW_SNAPSHOT_ISOLATION ON")
                 .AppendLine(sqlHelper.StatementTerminator)
-                .EndCommand();
+                .EndCommand(true);
 
             //    builder
             //        .Append("ALTER DATABASE ")

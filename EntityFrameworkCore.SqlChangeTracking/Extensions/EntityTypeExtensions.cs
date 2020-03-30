@@ -15,8 +15,8 @@ namespace EntityFrameworkCore.SqlChangeTracking
         public static bool IsSqlChangeTrackingEnabled(this IEntityType entityType)
             => entityType[SqlChangeTrackingAnnotationNames.Enabled] as bool? ?? false;
 
-        public static void SetSqlChangeTrackingEnabled(this IMutableEntityType entityType, bool enabled = true)
-            => entityType.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.Enabled, enabled);
+        public static void EnableSqlChangeTracking(this IMutableEntityType entityType)
+            => entityType.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.Enabled, true);
 
         public static bool GetTrackColumns(this IEntityType entityType)
             => entityType[SqlChangeTrackingAnnotationNames.TrackColumns] as bool? ?? false;

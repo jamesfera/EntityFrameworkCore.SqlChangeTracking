@@ -44,7 +44,7 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         path-to-lcov: ./EntityFrameworkCore.SqlChangeTracking.Tests/coverage.info   
     - name: Create nuget package
-      run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true --no-build
+      run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true -p:RepositoryUrl=https://github.com/jamesfera/EntityFrameworkCore.SqlChangeTracking --no-build
     - name: Push to GitHub NuGet
       run: nuget push **/*.nupkg -Source "GPR" -ApiKey ${{ secrets.GITHUB_TOKEN }}
 
