@@ -145,24 +145,23 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
         private static ChangeTrackingEntry<T> mapToChangeTrackingEntry<T>(DbDataReader reader, IEntityType entityType) where T : class, new()
         {
-            var entity = new T();
-            var entry = new ChangeTrackingEntry<T>(entity);
-
             var byteArray = reader[nameof(ChangeTrackingEntry<T>.ChangeContext)] as byte[];
 
-            entry.ChangeContext = byteArray == null ? null : Encoding.UTF8.GetString(byteArray);
-            entry.ChangeVersion = reader[nameof(ChangeTrackingEntry<T>.ChangeVersion)] as long?;
-            entry.CreationVersion = reader[nameof(ChangeTrackingEntry<T>.CreationVersion)] as long?;
+            var changeContext = byteArray == null ? null : Encoding.UTF8.GetString(byteArray);
+            var changeVersion = reader[nameof(ChangeTrackingEntry<T>.ChangeVersion)] as long?;
+            var creationVersion = reader[nameof(ChangeTrackingEntry<T>.CreationVersion)] as long?;
 
             var operation = reader[nameof(ChangeTrackingEntry<T>.ChangeOperation)] as string;
 
-            entry.ChangeOperation = operation switch
+            ChangeOperation? changeOperation = operation switch
                 {
                     "I" => ChangeOperation.Insert,
                     "U" => ChangeOperation.Update,
                     "D" => ChangeOperation.Delete,
-                    _ => ChangeOperation.None
+                    _ => null
                 };
+
+            var entry = new ChangeTrackingEntry<T>(new T(), changeVersion, creationVersion, changeOperation, changeContext);
 
             foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
@@ -172,7 +171,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
                 readerValue = readerValue == DBNull.Value ? null : readerValue;
 
-                propertyInfo.SetValue(entity, readerValue);
+                propertyInfo.SetValue(entry.Entity, readerValue);
             }
 
             return entry;

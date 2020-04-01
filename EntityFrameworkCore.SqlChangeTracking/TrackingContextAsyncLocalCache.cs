@@ -13,7 +13,9 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
         public static string? GetTrackingContextForTable(string tableName)
         {
-            if (AsyncLocalContext.Value.TryGetValue(tableName, out string value))
+            string value = null;
+
+            if (AsyncLocalContext.Value?.TryGetValue(tableName, out value) ?? false)
                 return value;
 
             return null;
