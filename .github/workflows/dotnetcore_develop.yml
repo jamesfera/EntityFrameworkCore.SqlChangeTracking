@@ -27,7 +27,9 @@ jobs:
         echo mode: Mainline > GitVersion.yml && echo branches: {} >> GitVersion.yml && echo ignore: >> GitVersion.yml && echo   sha: [] >> GitVersion.yml
         dotnet tool install -g dotnet-setversion && dotnet tool install -g GitVersion.Tool
         git fetch --no-tags --prune origin +refs/heads/master:refs/remotes/origin/master
+        type GitVersion.yml
         dotnet-gitversion -showvariable NugetVersionV2
+        type GitVersion.yml
         setversion -r $(dotnet-gitversion -showvariable NugetVersionV2)
     - name: Build with dotnet
       run: |
