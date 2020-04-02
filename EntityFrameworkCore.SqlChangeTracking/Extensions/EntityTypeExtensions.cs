@@ -28,5 +28,15 @@ namespace EntityFrameworkCore.SqlChangeTracking
         {
             return entityType.GetProperties().Select(p => p.GetColumnName()).ToArray();
         }
+
+        public static string GetActualSchema(this IEntityType entityType)
+        {
+            return string.IsNullOrEmpty(entityType.GetSchema()) ? string.IsNullOrEmpty(entityType.GetDefaultSchema()) ? "dbo" : entityType.GetDefaultSchema() : entityType.GetSchema();
+        }
+
+        public static string GetFullTableName(this IEntityType entityType)
+        {
+            return $"{entityType.GetActualSchema()}.{entityType.GetTableName()}";
+        }
     }
 }

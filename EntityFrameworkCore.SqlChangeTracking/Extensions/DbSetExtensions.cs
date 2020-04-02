@@ -70,8 +70,10 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             var primaryKey = entityType.FindPrimaryKey();
 
-            var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Select(c => $"{EntityTablePrefix}.{c}"));
+            var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Where(c => !primaryKey.Properties.Select(p => p.GetColumnName()).Contains(c)).Select(c => $"{EntityTablePrefix}.{c}"));
 
+            prefixedColumnNames += "," + string.Join(",", primaryKey.Properties.Select(p => $"{ChangeTablePrefix}.{p.GetColumnName()}"));
+            
             prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
 
             var pks = primaryKey.Properties.Select(pk => $"{EntityTablePrefix}.{pk.GetColumnName()} = {ChangeTablePrefix}.{pk.GetColumnName()}");
@@ -153,13 +155,15 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             var operation = reader[nameof(ChangeTrackingEntry<T>.ChangeOperation)] as string;
 
-            ChangeOperation? changeOperation = operation switch
+            ChangeOperation changeOperation = operation switch
                 {
                     "I" => ChangeOperation.Insert,
                     "U" => ChangeOperation.Update,
                     "D" => ChangeOperation.Delete,
-                    _ => null
+                    _ => ChangeOperation.None
                 };
+
+            //primaryKey.Properties.Select(p => p.)
 
             var entry = new ChangeTrackingEntry<T>(new T(), changeVersion, creationVersion, changeOperation, changeContext);
 

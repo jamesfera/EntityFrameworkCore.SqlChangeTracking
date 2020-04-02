@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Models
@@ -8,10 +10,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
     {
         public T Entity { get; }
 
-        public ChangeTrackingEntry(T entity,
+        internal ChangeTrackingEntry(T entity,
             long? changeVersion,
             long? creationVersion,
-            ChangeOperation? changeOperation,
+            ChangeOperation changeOperation,
             string? changeContext) 
             : base(changeVersion, creationVersion, changeOperation, changeContext)
         {
@@ -29,7 +31,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
 
     public abstract class ChangeTrackingEntry
     {
-        protected ChangeTrackingEntry(long? changeVersion, long? creationVersion, ChangeOperation? changeOperation, string? changeContext)
+        protected ChangeTrackingEntry(long? changeVersion, long? creationVersion, ChangeOperation changeOperation, string? changeContext)
         {
             ChangeVersion = changeVersion;
             CreationVersion = creationVersion;
@@ -37,13 +39,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
             ChangeContext = changeContext;
         }
 
-        //[Column("SYS_CHANGE_VERSION")]
         public long? ChangeVersion { get; }
-        //[Column("SYS_CHANGE_CREATION_VERSION")]
+
         public long? CreationVersion { get; }
-        //[Column("SYS_CHANGE_OPERATION")]
-        public ChangeOperation? ChangeOperation { get; }
-        //[Column("SYS_CHANGE_CONTEXT")]
+
+        public ChangeOperation ChangeOperation { get; }
+
         public string? ChangeContext { get; }
     }
 }

@@ -19,6 +19,16 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             return result?.snapshot_isolation_state_desc == "ON";
         }
+
+        public static IList<KeyValuePair<string, object>> GetLogContext<TContext>(this TContext dbContext) where TContext : DbContext
+        {
+            return new List<KeyValuePair<string, object>>()
+            {
+                new KeyValuePair<string, object>("DbContextId", dbContext.ContextId),
+                new KeyValuePair<string, object>("DatabaseName", dbContext.Database.GetDbConnection().Database),
+                new KeyValuePair<string, object>("DbContextType", dbContext.GetType()),
+            };
+        }
     }
 
     internal static class InternalDbContextExtensions

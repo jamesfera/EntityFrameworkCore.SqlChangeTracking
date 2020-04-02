@@ -1,4 +1,5 @@
 ﻿using System;
+using EntityFrameworkCore.SqlChangeTracking.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -6,9 +7,9 @@ namespace EntityFrameworkCore.SqlChangeTracking
 {
     public static class ModelBuilderExtensions
     {
-        public static ModelBuilder ConfigureChangeTracking(this ModelBuilder modelBuilder, Action<ChangeTrackingConfigurationBuilder>? configBuilderAction = null)
+        public static ModelBuilder ConfigureChangeTracking(this ModelBuilder modelBuilder, Action<SqlChangeTrackingModelOptions>? configBuilderAction = null)
         {
-            var configBuilder = new ChangeTrackingConfigurationBuilder();
+            var configBuilder = new SqlChangeTrackingModelOptions();
 
             configBuilderAction?.Invoke(configBuilder);
             
@@ -22,12 +23,5 @@ namespace EntityFrameworkCore.SqlChangeTracking
             
             return modelBuilder;
         }
-    }
-
-    public class ChangeTrackingConfigurationBuilder
-    {
-        public bool EnableSnapshotIsolation { get; set; } = true;
-        public int RetentionDays { get; set; } = 2;
-        public bool AutoCleanUp { get; set; } = true;
     }
 }
