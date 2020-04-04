@@ -60,7 +60,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return new TrackingContextAsyncLocalCache.ChangeTrackingContext(tableName, trackingContext);
         }
 
-        internal static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
+        public static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
         {
             //TODO Handle deletes
 
@@ -72,6 +72,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Where(c => !primaryKey.Properties.Select(p => p.GetColumnName()).Contains(c)).Select(c => $"{EntityTablePrefix}.{c}"));
 
+            //pull the primary key from the Change Table otherwise it will be null for a delete operation
             prefixedColumnNames += "," + string.Join(",", primaryKey.Properties.Select(p => $"{ChangeTablePrefix}.{p.GetColumnName()}"));
             
             prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
@@ -106,7 +107,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return GetChangesSinceVersion<T>(context, entityType, version);
         }
 
-        public static IEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet, long version) where T : class, new()
+        public static IEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet) where T : class, new()
         {
             //TODO Handle deletes
 
@@ -162,8 +163,6 @@ namespace EntityFrameworkCore.SqlChangeTracking
                     "D" => ChangeOperation.Delete,
                     _ => ChangeOperation.None
                 };
-
-            //primaryKey.Properties.Select(p => p.)
 
             var entry = new ChangeTrackingEntry<T>(new T(), changeVersion, creationVersion, changeOperation, changeContext);
 

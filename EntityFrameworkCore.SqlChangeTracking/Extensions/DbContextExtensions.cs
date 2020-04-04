@@ -10,15 +10,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 {
     public static class DbContextExtensions
     {
-        public static bool IsSnapshotIsolationEnabled<TContext>(this TContext dbContext) where TContext : DbContext
-        {
-            var sql =
-                $"SELECT snapshot_isolation_state_desc from sys.databases where name = '{dbContext.Database.GetDbConnection().Database}'";
-
-            var result = dbContext.SqlQuery(() => new {snapshot_isolation_state_desc = ""}, sql).FirstOrDefault();
-
-            return result?.snapshot_isolation_state_desc == "ON";
-        }
+        
 
         public static IList<KeyValuePair<string, object>> GetLogContext<TContext>(this TContext dbContext) where TContext : DbContext
         {
