@@ -2,11 +2,10 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.Common;
-using System.Dynamic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -14,10 +13,8 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
-namespace EntityFrameworkCore.SqlChangeTracking
+namespace EntityFrameworkCore.SqlChangeTracking.Extensions
 {
     public static class DbSetExtensions
     {
@@ -60,10 +57,8 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return new TrackingContextAsyncLocalCache.ChangeTrackingContext(tableName, trackingContext);
         }
 
-        public static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
+        public static async IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
         {
-            //TODO Handle deletes
-
             Validate(entityType);
 
             var tableName = entityType.GetTableName();
@@ -92,13 +87,13 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             sqlBuilder.AppendLine("COMMIT TRAN");
 
-            var reader = context.Database.ExecuteSqlQuery(sqlBuilder.ToString()).DbDataReader;
+            var reader = (await context.Database.ExecuteSqlQueryAsync(sqlBuilder.ToString())).DbDataReader;
 
-            while (reader.Read())
+            while (await reader.ReadAsync())
                 yield return mapToChangeTrackingEntry<T>(reader, entityType);
         }
 
-        public static IEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbSet<T> dbSet, long version) where T : class, new()
+        public static IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbSet<T> dbSet, long version) where T : class, new()
         {
             var context = dbSet.GetService<ICurrentDbContext>().Context;
 
@@ -107,10 +102,8 @@ namespace EntityFrameworkCore.SqlChangeTracking
             return GetChangesSinceVersion<T>(context, entityType, version);
         }
 
-        public static IEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet) where T : class, new()
+        public static async IAsyncEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet) where T : class, new()
         {
-            //TODO Handle deletes
-
             var context = dbSet.GetService<ICurrentDbContext>().Context;
 
             var entityType = context.Model.FindEntityType(typeof(T));
@@ -140,9 +133,9 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             sqlBuilder.AppendLine("COMMIT TRAN");
 
-            var reader = context.Database.ExecuteSqlQuery(sqlBuilder.ToString()).DbDataReader;
+            var reader = (await context.Database.ExecuteSqlQueryAsync(sqlBuilder.ToString())).DbDataReader;
 
-            while (reader.Read())
+            while (await reader.ReadAsync())
                 yield return mapToChangeTrackingEntry<T>(reader, entityType);
         }
 
@@ -205,7 +198,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
         private static object Private(this object obj, string privateField) => obj?.GetType().GetField(privateField, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(obj);
         private static T Private<T>(this object obj, string privateField) => (T)obj?.GetType().GetField(privateField, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(obj);
 
-        internal static RelationalDataReader ExecuteSqlQuery(this DatabaseFacade databaseFacade, string sql, params object[] parameters)
+        internal static Task<RelationalDataReader> ExecuteSqlQueryAsync(this DatabaseFacade databaseFacade, string sql, params object[] parameters)
         {
             var concurrencyDetector = databaseFacade.GetService<IConcurrencyDetector>();
 
@@ -219,7 +212,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
             return rawSqlCommand
                 .RelationalCommand
-                .ExecuteReader(paramObject);
+                .ExecuteReaderAsync(paramObject);
         }
     }
 
