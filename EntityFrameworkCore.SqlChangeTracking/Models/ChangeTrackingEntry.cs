@@ -6,7 +6,18 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace EntityFrameworkCore.SqlChangeTracking.Models
 {
     public enum ChangeOperation { None, Insert, Update, Delete }
-    public class ChangeTrackingEntry<T> : ChangeTrackingEntry
+
+    public interface IChangeTrackingEntry<out T>
+    {
+        long? ChangeVersion { get; }
+        long? CreationVersion { get; }
+        ChangeOperation ChangeOperation { get; }
+        string? ChangeContext { get; }
+
+        T Entity { get; }
+    }
+
+    public class ChangeTrackingEntry<T> : ChangeTrackingEntry, IChangeTrackingEntry<T>
     {
         public T Entity { get; }
 
