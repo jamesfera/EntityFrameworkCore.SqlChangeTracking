@@ -38,5 +38,24 @@ namespace EntityFrameworkCore.SqlChangeTracking
         {
             return $"{entityType.GetActualSchema()}.{entityType.GetTableName()}";
         }
+
+        public static string GetPrimaryKeyString(this IEntityType entityType, string prefix = null)
+        {
+            return string.Join(",", GetPrimaryKeyColumnNames(entityType, prefix));
+        }
+
+        public static string[] GetPrimaryKeyColumnNames(this IEntityType entityType, string prefix = null)
+        {
+            prefix = prefix == null ? "" : $"{prefix}.";
+
+            return  entityType.FindPrimaryKey().Properties.Select(p => $"{prefix}{p.GetColumnName()}").ToArray();
+        }
+
+        public static string[] GetColumnNames(this IEntityType entityType, bool excludePrimaryKeyColumns)
+        {
+            var primaryKeyColumnNames = entityType.FindPrimaryKey().Properties.Select(p => p.GetColumnName()).ToArray();
+
+            return entityType.GetColumnNames().Where(c => !primaryKeyColumnNames.Contains(c)).ToArray();
+        }
     }
 }

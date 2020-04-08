@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Models;
+using EntityFrameworkCore.SqlChangeTracking.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -18,8 +19,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
 {
     public static class DbSetExtensions
     {
-        private const string EntityTablePrefix = "T";
-        private const string ChangeTablePrefix = "CT";
+        
 
         public interface ICurrentTrackingContext
         {
@@ -57,40 +57,50 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
             return new TrackingContextAsyncLocalCache.ChangeTrackingContext(tableName, trackingContext);
         }
 
-        public static async IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
+        public static IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangeSetForVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
         {
             Validate(entityType);
 
-            var tableName = entityType.GetTableName();
+            var sqlBuilder = new StringBuilder();
 
-            var primaryKey = entityType.FindPrimaryKey();
+            //if (context.Model.IsSnapshotIsolationEnabled())
+            //    sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
 
-            var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Where(c => !primaryKey.Properties.Select(p => p.GetColumnName()).Contains(c)).Select(c => $"{EntityTablePrefix}.{c}"));
+            //sqlBuilder.AppendLine("BEGIN TRAN");
 
-            //pull the primary key from the Change Table otherwise it will be null for a delete operation
-            prefixedColumnNames += "," + string.Join(",", primaryKey.Properties.Select(p => $"{ChangeTablePrefix}.{p.GetColumnName()}"));
-            
-            prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
+            sqlBuilder.AppendLine(ChangeTableSqlStatements.GetNextChangeSet(entityType, "0", version.ToString()));
 
-            var pks = primaryKey.Properties.Select(pk => $"{EntityTablePrefix}.{pk.GetColumnName()} = {ChangeTablePrefix}.{pk.GetColumnName()}");
+            //sqlBuilder.AppendLine("COMMIT TRAN");
 
-            var joinKeyStatement = string.Join(" AND ", pks);
+            return context.ToChangeSet<T>(sqlBuilder.ToString());
+        }
+
+        public static IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangeSetForVersion<T>(this DbSet<T> dbSet, long version) where T : class, new()
+        {
+            var context = dbSet.GetService<ICurrentDbContext>().Context;
+
+            var entityType = context.Model.FindEntityType(typeof(T));
+
+            return GetChangeSetForVersion<T>(context, entityType, version);
+        }
+
+        public static IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
+        {
+            Validate(entityType);
 
             var sqlBuilder = new StringBuilder();
 
-            if (context.Model.IsSnapshotIsolationEnabled())
-                sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
+            //if (context.Model.IsSnapshotIsolationEnabled())
+            //    sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
 
-            sqlBuilder.AppendLine("BEGIN TRAN");
+            //sqlBuilder.AppendLine("BEGIN TRAN");
 
-            sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} RIGHT OUTER JOIN CHANGETABLE(CHANGES {tableName}, {version}) AS {ChangeTablePrefix} ON {joinKeyStatement} ORDER BY ChangeVersion");
+            sqlBuilder.AppendLine(ChangeTableSqlStatements.GetNextChangeSet(entityType, "0", version.ToString()));
+            //sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {ChangeTableSqlStatements.EntityTablePrefix} RIGHT OUTER JOIN CHANGETABLE(CHANGES {tableName}, {version}) AS {ChangeTableSqlStatements.ChangeTablePrefix} ON {joinKeyStatement} ORDER BY ChangeVersion");
 
-            sqlBuilder.AppendLine("COMMIT TRAN");
+            //sqlBuilder.AppendLine("COMMIT TRAN");
 
-            var reader = (await context.Database.ExecuteSqlQueryAsync(sqlBuilder.ToString())).DbDataReader;
-
-            while (await reader.ReadAsync())
-                yield return mapToChangeTrackingEntry<T>(reader, entityType);
+            return context.ToChangeSet<T>(sqlBuilder.ToString());
         }
 
         public static IAsyncEnumerable<ChangeTrackingEntry<T>> GetChangesSinceVersion<T>(this DbSet<T> dbSet, long version) where T : class, new()
@@ -102,38 +112,48 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
             return GetChangesSinceVersion<T>(context, entityType, version);
         }
 
-        public static async IAsyncEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet) where T : class, new()
+        //public static async IAsyncEnumerable<ChangeTrackingEntry<T>> GetAllChanges<T>(this DbSet<T> dbSet) where T : class, new()
+        //{
+        //    var context = dbSet.GetService<ICurrentDbContext>().Context;
+
+        //    var entityType = context.Model.FindEntityType(typeof(T));
+
+        //    Validate(entityType);
+
+        //    var tableName = entityType.GetTableName();
+
+        //    var primaryKey = entityType.FindPrimaryKey();
+
+        //    var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Select(c => $"{EntityTablePrefix}.{c}"));
+
+        //    prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
+
+        //    var pks = primaryKey.Properties.Select(pk => $"{EntityTablePrefix}.{pk.GetColumnName()} = {ChangeTablePrefix}.{pk.GetColumnName()}");
+
+        //    var joinKeyStatement = string.Join(" AND ", pks);
+
+        //    var sqlBuilder = new StringBuilder();
+
+        //    if (context.Model.IsSnapshotIsolationEnabled())
+        //        sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
+
+        //    sqlBuilder.AppendLine("BEGIN TRAN");
+
+        //    sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} LEFT OUTER JOIN CHANGETABLE(CHANGES {tableName}, null) AS {ChangeTablePrefix} ON {joinKeyStatement}");
+
+        //    sqlBuilder.AppendLine("COMMIT TRAN");
+
+        //    var reader = (await context.Database.ExecuteSqlQueryAsync(sqlBuilder.ToString())).DbDataReader;
+
+        //    while (await reader.ReadAsync())
+        //        yield return mapToChangeTrackingEntry<T>(reader, entityType);
+        //}
+
+        public static async IAsyncEnumerable<ChangeTrackingEntry<T>> ToChangeSet<T>(this DbContext dbContext, string rawSql) where T : class, new()
         {
-            var context = dbSet.GetService<ICurrentDbContext>().Context;
+            var entityType = dbContext.Model.FindEntityType(typeof(T));
 
-            var entityType = context.Model.FindEntityType(typeof(T));
-
-            Validate(entityType);
-
-            var tableName = entityType.GetTableName();
-
-            var primaryKey = entityType.FindPrimaryKey();
-
-            var prefixedColumnNames = string.Join(",", entityType.GetColumnNames().Select(c => $"{EntityTablePrefix}.{c}"));
-
-            prefixedColumnNames += ",SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext";
-
-            var pks = primaryKey.Properties.Select(pk => $"{EntityTablePrefix}.{pk.GetColumnName()} = {ChangeTablePrefix}.{pk.GetColumnName()}");
-
-            var joinKeyStatement = string.Join(" AND ", pks);
-
-            var sqlBuilder = new StringBuilder();
-
-            if (context.Model.IsSnapshotIsolationEnabled())
-                sqlBuilder.AppendLine("SET TRANSACTION ISOLATION LEVEL SNAPSHOT;");
-
-            sqlBuilder.AppendLine("BEGIN TRAN");
-
-            sqlBuilder.AppendLine($"SELECT {prefixedColumnNames} FROM {tableName} AS {EntityTablePrefix} LEFT OUTER JOIN CHANGETABLE(CHANGES {tableName}, null) AS {ChangeTablePrefix} ON {joinKeyStatement}");
-
-            sqlBuilder.AppendLine("COMMIT TRAN");
-
-            var reader = (await context.Database.ExecuteSqlQueryAsync(sqlBuilder.ToString())).DbDataReader;
+            var reader = (await dbContext.Database.ExecuteSqlQueryAsync(rawSql)).DbDataReader;
 
             while (await reader.ReadAsync())
                 yield return mapToChangeTrackingEntry<T>(reader, entityType);

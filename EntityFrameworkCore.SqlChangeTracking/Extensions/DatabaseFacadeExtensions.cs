@@ -22,7 +22,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
             return result.ToString() == "TRUE";
         }
 
-        public static async Task<bool> IsSnapshotIsolationEnabled<TContext>(this DatabaseFacade database) where TContext : DbContext
+        public static async Task<bool> IsSnapshotIsolationEnabled(this DatabaseFacade database)
         {
             var sql =
                 $"SELECT snapshot_isolation_state_desc from sys.databases where name = '{database.GetDbConnection().Database}'";

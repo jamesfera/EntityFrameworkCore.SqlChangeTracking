@@ -4,7 +4,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking
 {
@@ -21,10 +23,18 @@ namespace EntityFrameworkCore.SqlChangeTracking
                 new KeyValuePair<string, object>("DbContextType", dbContext.GetType()),
             };
         }
-    }
 
+
+    }
+    
     internal static class InternalDbContextExtensions
-    { 
+    {
+        public static Task<List<T>> SqlQueryAsync<T>(this DbContext db, Func<T> targetType, string sql, params object[] parameters) where T : class
+        {
+            using var db2 = new ContextForQueryType<T>(db.Database.GetDbConnection());
+
+            return db2.Set<T>().FromSqlRaw(sql, parameters).ToListAsync();
+        }
         public static IList<T> SqlQuery<T>(this DbContext db, Func<T> targetType, string sql, params object[] parameters) where T : class
         {
             return SqlQuery<T>(db, sql, parameters);
