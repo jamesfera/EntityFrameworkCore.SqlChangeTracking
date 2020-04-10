@@ -7,13 +7,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
 {
     public enum ChangeOperation { None, Insert, Update, Delete }
 
-    public interface IChangeTrackingEntry<out T>
+    public interface IChangeTrackingEntry
     {
         long? ChangeVersion { get; }
         long? CreationVersion { get; }
         ChangeOperation ChangeOperation { get; }
         string? ChangeContext { get; }
+    }
 
+    public interface IChangeTrackingEntry<out T> : IChangeTrackingEntry
+    {
         T Entity { get; }
     }
 
@@ -40,7 +43,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
         }
     }
 
-    public abstract class ChangeTrackingEntry
+    public abstract class ChangeTrackingEntry : IChangeTrackingEntry
     {
         protected ChangeTrackingEntry(long? changeVersion, long? creationVersion, ChangeOperation changeOperation, string? changeContext)
         {
