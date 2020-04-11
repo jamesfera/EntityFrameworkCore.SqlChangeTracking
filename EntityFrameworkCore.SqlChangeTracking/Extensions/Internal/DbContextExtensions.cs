@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
 {
@@ -24,6 +25,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
             while (await reader.ReadAsync())
                 yield return mapToChangeTrackingEntry<T>(reader, entityType);
         }
+
+        static Func<object, object> DefaultValueConverter = o => o == DBNull.Value ? null : o;
 
         static IChangeTrackingEntry<T> mapToChangeTrackingEntry<T>(DbDataReader reader, IEntityType entityType) where T : class, new()
         {
@@ -44,14 +47,18 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 };
 
             var entry = new ChangeTrackingEntry<T>(new T(), changeVersion, creationVersion, changeOperation, changeContext);
+            
+            var propertyLookup = entityType.GetProperties().ToDictionary(p => p.Name, p => p);
 
             foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
-                var columnName = entityType.GetProperties().First(p => p.Name == propertyInfo.Name).GetColumnName();
+                var entityProperty = propertyLookup[propertyInfo.Name];
 
-                object? readerValue = reader[columnName];
+                var valueConverter = propertyLookup[propertyInfo.Name].GetValueConverter()?.ConvertFromProvider ?? DefaultValueConverter;
+                
+                var columnName = entityProperty.GetColumnName();
 
-                readerValue = readerValue == DBNull.Value ? null : readerValue;
+                object? readerValue = valueConverter(reader[columnName]);
 
                 propertyInfo.SetValue(entry.Entity, readerValue);
             }
@@ -69,7 +76,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 .GetService<IRawSqlCommandBuilder>()
                 .Build(sql, parameters);
 
-            var paramObject = new RelationalCommandParameterObject(databaseFacade.GetService<IRelationalConnection>(), rawSqlCommand.ParameterValues, null, null);
+            var paramObject = new RelationalCommandParameterObject(databaseFacade.GetService<IRelationalConnection>(), rawSqlCommand.ParameterValues, null, null, null);
 
             return rawSqlCommand
                 .RelationalCommand
