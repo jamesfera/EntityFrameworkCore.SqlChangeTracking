@@ -79,7 +79,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         protected override TestHelpers TestHelpers { get; } = new RelationalTestHelpers(s =>
         {
             s.AddScoped<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
-            s.AddScoped<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
+            //s.AddScoped<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
             s.AddScoped<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();
         });
 

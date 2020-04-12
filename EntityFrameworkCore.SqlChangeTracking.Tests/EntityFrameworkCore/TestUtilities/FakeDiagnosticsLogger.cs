@@ -19,6 +19,7 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
         public ILogger Logger => this;
 
         public DiagnosticSource DiagnosticSource { get; } = new DiagnosticListener("Fake");
+        public IDbContextLogger DbContextLogger { get; set; }
 
         public void Log<TState>(
             LogLevel logLevel,
