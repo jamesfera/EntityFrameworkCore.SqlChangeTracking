@@ -17,7 +17,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
 
             var sql = $"select ISNULL((SELECT cast('TRUE' as varchar(5))  FROM sys.change_tracking_tables where object_id = OBJECT_ID('{tableName}')),'FALSE') as IsEnabled";
 
-            var result = await database.ExecuteSqlRawAsync(sql);
+            var result = await database.ExecuteSqlRawAsync(sql).ConfigureAwait(false);
 
             return result.ToString() == "TRUE";
         }
@@ -27,7 +27,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
             var sql =
                 $"SELECT snapshot_isolation_state_desc from sys.databases where name = '{database.GetDbConnection().Database}'";
 
-            var result = await database.ExecuteSqlRawAsync(sql);
+            var result = await database.ExecuteSqlRawAsync(sql).ConfigureAwait(false);
 
             return result > 0;
         }

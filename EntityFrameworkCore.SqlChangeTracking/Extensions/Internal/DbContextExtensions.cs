@@ -20,9 +20,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
         {
             var entityType = dbContext.Model.FindEntityType(typeof(T));
 
-            var reader = (await dbContext.Database.ExecuteSqlQueryAsync(rawSql)).DbDataReader;
+            var reader = (await dbContext.Database.ExecuteSqlQueryAsync(rawSql).ConfigureAwait(false)).DbDataReader;
 
-            while (await reader.ReadAsync())
+            while (await reader.ReadAsync().ConfigureAwait(false))
                 yield return mapToChangeTrackingEntry<T>(reader, entityType);
         }
 
