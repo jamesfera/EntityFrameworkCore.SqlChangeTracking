@@ -52,7 +52,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
 
             foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
-                var entityProperty = propertyLookup[propertyInfo.Name];
+                if (!propertyLookup.TryGetValue(propertyInfo.Name, out var entityProperty))
+                    continue;
 
                 var valueConverter = propertyLookup[propertyInfo.Name].GetValueConverter()?.ConvertFromProvider ?? DefaultValueConverter;
                 
