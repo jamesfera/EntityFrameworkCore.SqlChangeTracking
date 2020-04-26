@@ -59,7 +59,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 
                 var columnName = entityProperty.GetColumnName();
 
-                object? readerValue = valueConverter(reader[columnName]);
+                var value = reader[columnName];
+
+                value = value is DBNull ? null : value;
+
+                object? readerValue = null;
+
+                if (value != null)
+                    readerValue = valueConverter(value);
 
                 propertyInfo.SetValue(entry.Entity, readerValue);
             }
@@ -83,7 +90,5 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 .RelationalCommand
                 .ExecuteReaderAsync(paramObject);
         }
-
-
     }
 }
