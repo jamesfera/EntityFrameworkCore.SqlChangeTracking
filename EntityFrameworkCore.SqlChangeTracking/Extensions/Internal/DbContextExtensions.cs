@@ -50,7 +50,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
             
             var propertyLookup = entityType.GetProperties().ToDictionary(p => p.Name, p => p);
 
-            foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 if (!propertyLookup.TryGetValue(propertyInfo.Name, out var entityProperty))
                     continue;
