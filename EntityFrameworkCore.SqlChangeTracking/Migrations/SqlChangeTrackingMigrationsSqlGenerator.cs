@@ -13,7 +13,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 {
     public class SqlChangeTrackingMigrationsSqlGenerator : SqlServerMigrationsSqlGenerator
     {
-        public SqlChangeTrackingMigrationsSqlGenerator(MigrationsSqlGeneratorDependencies dependencies, IMigrationsAnnotationProvider migrationsAnnotations) : base(dependencies, migrationsAnnotations) { }
+        public SqlChangeTrackingMigrationsSqlGenerator(MigrationsSqlGeneratorDependencies dependencies, IRelationalAnnotationProvider migrationsAnnotations) : base(dependencies, migrationsAnnotations) { }
         
         void Generate(EnableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {

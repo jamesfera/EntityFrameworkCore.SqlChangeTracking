@@ -13,13 +13,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
     {
         public SqlChangeTrackingMigrationsAnnotationProvider(MigrationsAnnotationProviderDependencies dependencies) : base(dependencies) { }
 
-        public override IEnumerable<IAnnotation> For(IEntityType entityType)
-        {
-            return base.For(entityType).Concat(entityType.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
-        }
-        public override IEnumerable<IAnnotation> For(IModel model)
-        {
-            return base.For(model).Concat(model.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
-        }
+        
+        //public override IEnumerable<IAnnotation> For(IEntityType entityType)
+        //{
+        //    return base.For(entityType).Concat(entityType.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
+        //}
+        //public override IEnumerable<IAnnotation> For(IModel model)
+        //{
+        //    return base.For(model).Concat(model.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
+        //}
     }
 }
