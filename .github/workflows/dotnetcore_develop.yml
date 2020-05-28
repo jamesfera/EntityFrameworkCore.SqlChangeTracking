@@ -33,16 +33,16 @@ jobs:
         nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GPR_KEY }} -StorePasswordInClearText
         dotnet add ./EntityFrameworkCore.SqlChangeTracking/ package Microsoft.SourceLink.GitHub
         dotnet build --configuration Release
-    - name: Test with dotnet
-      run: |
-        cd ./EntityFrameworkCore.SqlChangeTracking.Tests/
-        dotnet add package coverlet.msbuild
-        dotnet test --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build
-    - name: Publish coverage report to coveralls.io
-      uses: coverallsapp/github-action@v1.0.1
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        path-to-lcov: ./EntityFrameworkCore.SqlChangeTracking.Tests/coverage.info   
+    # - name: Test with dotnet
+    #   run: |
+    #     cd ./EntityFrameworkCore.SqlChangeTracking.Tests/
+    #     dotnet add package coverlet.msbuild
+    #     dotnet test --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=lcov --no-build
+    # - name: Publish coverage report to coveralls.io
+    #   uses: coverallsapp/github-action@v1.0.1
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
+    #     path-to-lcov: ./EntityFrameworkCore.SqlChangeTracking.Tests/coverage.info   
     - name: Create nuget package
       run: dotnet pack --configuration Release -o . -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -p:PublishRepositoryUrl=true -p:EmbedUntrackedSources=true --no-build
     - name: Push to GitHub NuGet

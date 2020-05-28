@@ -50,7 +50,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         protected void AssertSql(string expected)
             => Assert.Equal(expected, Sql, ignoreLineEndingDifferences: true);
 
-        protected override IMigrationsModelDiffer CreateModelDiffer(DbContextOptions options)
+        protected override MigrationsModelDiffer CreateModelDiffer(DbContextOptions options)
         {
             var context = TestHelpers.CreateContext(options);
 

@@ -26,7 +26,7 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
         }
             
 
-        protected override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
+        public override void UseProviderOptions(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder.UseFakeRelational();
         }
