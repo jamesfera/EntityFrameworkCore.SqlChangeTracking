@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Migrations;
 using EntityFrameworkCore.SqlChangeTracking.SqlServer;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.SqlServer.Update.Internal;
 
@@ -25,6 +26,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
             {
                 builder.ReplaceService<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();
                 builder.ReplaceService<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
+                builder.ReplaceService<IRelationalAnnotationProvider, SqlChangeTrackingRelationalAnnotationProvider>();
                 builder.ReplaceService<ISqlServerUpdateSqlGenerator, SqlChangeTrackingUpdateSqlGenerator>();
 
                 //builder.ReplaceService<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();

@@ -6,6 +6,7 @@ using EntityFrameworkCore.SqlChangeTracking.Migrations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Internal;
@@ -40,7 +41,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
             buildAction(modelBuilder);
 
             var batch = TestHelpers.CreateContextServices().GetRequiredService<IMigrationsSqlGenerator>()
-                .Generate(operation, modelBuilder.Model);
+                .Generate(operation, modelBuilder.Model.FinalizeModel());
 
             Sql = string.Join(
                 "GO" + EOL + EOL,
@@ -79,6 +80,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
         protected override TestHelpers TestHelpers { get; } = new RelationalTestHelpers(s =>
         {
             s.AddScoped<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
+            s.AddScoped<IRelationalAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider1>();
             //s.AddScoped<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
             s.AddScoped<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();
         });
