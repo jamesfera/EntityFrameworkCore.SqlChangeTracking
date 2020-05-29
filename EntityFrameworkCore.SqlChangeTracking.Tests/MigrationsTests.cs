@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Internal;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using Microsoft.EntityFrameworkCore.SqlServer.Migrations.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Update;
@@ -70,7 +71,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
                 new TestRelationalTypeMappingSource(
                     TestServiceFactory.Instance.Create<TypeMappingSourceDependencies>(),
                     TestServiceFactory.Instance.Create<RelationalTypeMappingSourceDependencies>()),
-                new SqlChangeTrackingMigrationsAnnotationProvider(new MigrationsAnnotationProviderDependencies()),
+                new SqlServerMigrationsAnnotationProvider(new MigrationsAnnotationProviderDependencies()),
                 context.GetService<IChangeDetector>(),
                 context.GetService<IUpdateAdapterFactory>(),
                 context.GetService<CommandBatchPreparerDependencies>());
@@ -79,7 +80,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Tests
 
         protected override TestHelpers TestHelpers { get; } = new RelationalTestHelpers(s =>
         {
-            s.AddScoped<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
             s.AddScoped<IRelationalAnnotationProvider, SqlChangeTrackingRelationalAnnotationProvider>();
             //s.AddScoped<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
             s.AddScoped<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();

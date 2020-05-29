@@ -1,33 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.SqlServer.Migrations.Internal;
+using Microsoft.EntityFrameworkCore.SqlServer.Metadata.Internal;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 {
-    public class SqlChangeTrackingMigrationsAnnotationProvider : MigrationsAnnotationProvider
-    {
-        public SqlChangeTrackingMigrationsAnnotationProvider(MigrationsAnnotationProviderDependencies dependencies) : base(dependencies)
-        {
-            int j = 0;
-        }
-
-        public override IEnumerable<IAnnotation> ForRemove(IRelationalModel model)
-        {
-            return base.ForRemove(model).Concat(model.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
-        }
-
-        public override IEnumerable<IAnnotation> ForRemove(ITable table)
-        {
-            return base.ForRemove(table).Concat(table.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
-        }
-    }
-
-    public class SqlChangeTrackingRelationalAnnotationProvider : RelationalAnnotationProvider
+    public class SqlChangeTrackingRelationalAnnotationProvider : SqlServerAnnotationProvider
     {
         public override IEnumerable<IAnnotation> For(IRelationalModel model)
         {
@@ -38,8 +18,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
         {
             return base.For(table).Concat(table.EntityTypeMappings.First().EntityType.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
         }
-        public SqlChangeTrackingRelationalAnnotationProvider(RelationalAnnotationProviderDependencies dependencies) : base(dependencies)
-        {
-        }
+        public SqlChangeTrackingRelationalAnnotationProvider(RelationalAnnotationProviderDependencies dependencies) : base(dependencies) { }
     }
 }

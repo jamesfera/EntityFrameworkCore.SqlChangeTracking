@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Data.Common;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Migrations;
 using EntityFrameworkCore.SqlChangeTracking.SqlServer;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -24,8 +19,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
             
             if (coreOptions.InternalServiceProvider == null)
             {
-                builder.ReplaceService<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();
-                builder.ReplaceService<IMigrationsAnnotationProvider, SqlChangeTrackingMigrationsAnnotationProvider>();
+                builder.ReplaceService<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();               
                 builder.ReplaceService<IRelationalAnnotationProvider, SqlChangeTrackingRelationalAnnotationProvider>();
                 builder.ReplaceService<ISqlServerUpdateSqlGenerator, SqlChangeTrackingUpdateSqlGenerator>();
 
