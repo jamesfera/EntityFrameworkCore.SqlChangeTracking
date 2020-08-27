@@ -53,11 +53,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
 
             //primary key columns
             sb.Append(string.Join(",", entityType.FindPrimaryKey().Properties.Select(c => $"{changeTablePrefix}.{c.GetColumnName()}")));
+            
+            var entityColumns = entityType.GetColumnNames(true).Select(c => $"{entityTablePrefix}.{c}");
 
-            sb.Append(",");
-
-            //entity columns
-            sb.Append(string.Join(",", entityType.GetColumnNames(true).Select(c => $"{entityTablePrefix}.{c}")));
+            if (entityColumns.Any())
+            {
+                sb.Append(",");
+                sb.Append(string.Join(",", entityColumns));
+            }
 
             sb.Append(",");
 
