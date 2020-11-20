@@ -48,7 +48,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
         {
             prefix = prefix == null ? "" : $"{prefix}.";
 
-            return  entityType.FindPrimaryKey().Properties.Select(p => $"{prefix}{p.GetColumnName()}").ToArray();
+            return  entityType.FindPrimaryKey().Properties.Select(p => $"{prefix}{p.GetColumnName(StoreObjectIdentifier.Create(entityType, StoreObjectType.Table).Value)}").ToArray();
         }
 
         public static string[] GetColumnNames(this IEntityType entityType, bool excludePrimaryKeyColumns)
@@ -56,6 +56,15 @@ namespace EntityFrameworkCore.SqlChangeTracking
             var primaryKeyColumnNames = entityType.FindPrimaryKey().Properties.Select(p => p.GetColumnName()).ToArray();
 
             return entityType.GetColumnNames().Where(c => !primaryKeyColumnNames.Contains(c)).ToArray();
+        }
+
+        public static string[] GetDeclaredColumnNames(this IEntityType entityType, bool excludePrimaryKeyColumns)
+        {
+            var tableIdentifier = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table);
+
+            var primaryKeyColumnNames = entityType.FindPrimaryKey().Properties.Select(p => p.GetColumnName(tableIdentifier.Value)).ToArray();
+
+            return entityType.GetDeclaredProperties().Select(p => p.GetColumnName(tableIdentifier.Value)).Where(c => !primaryKeyColumnNames.Contains(c)).ToArray();
         }
     }
 }

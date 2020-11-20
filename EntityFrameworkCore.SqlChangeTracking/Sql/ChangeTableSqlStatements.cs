@@ -51,10 +51,28 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
         {
             StringBuilder sb = new StringBuilder();
 
-            //primary key columns
-            sb.Append(string.Join(",", entityType.FindPrimaryKey().Properties.Select(c => $"{changeTablePrefix}.{c.GetColumnName()}")));
             
-            var entityColumns = entityType.GetColumnNames(true).Select(c => $"{entityTablePrefix}.{c}");
+            //primary key columns
+            sb.Append(string.Join(",", entityType.GetPrimaryKeyColumnNames(changeTablePrefix)));
+
+            var baseType = entityType.BaseType;
+
+            while (baseType != null)
+            {
+                var basePrefix = "B1";
+
+                var baseColumns = baseType.GetDeclaredColumnNames(true);
+
+                foreach (var baseColumn in baseColumns)
+                {
+                    sb.Append(",");
+                    sb.Append($"(SELECT {basePrefix}.{baseColumn} FROM {baseType.GetTableName()} AS {basePrefix} WHERE {GetJoinConditionExpression(baseType, basePrefix, entityTablePrefix)}) AS {baseColumn}");
+                }
+
+                baseType = baseType.BaseType;
+            }
+
+            var entityColumns = entityType.GetDeclaredColumnNames(true).Select(c => $"{entityTablePrefix}.{c}");
 
             if (entityColumns.Any())
             {
@@ -66,6 +84,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
 
             //change table columns
             sb.Append("SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext");
+
 
             return sb.ToString();
         }
