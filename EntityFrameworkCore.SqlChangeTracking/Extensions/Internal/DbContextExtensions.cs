@@ -68,7 +68,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 if (value != null)
                     readerValue = valueConverter(value);
 
-                propertyInfo.SetValue(entry.Entity, readerValue);
+                propertyInfo.SetValue(entry.Entry, readerValue);
             }
 
             return entry;

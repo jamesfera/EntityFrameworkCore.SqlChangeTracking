@@ -17,12 +17,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
 
     public interface IChangeTrackingEntry<out T> : IChangeTrackingEntry
     {
-        T Entity { get; }
+        T Entry { get; }
     }
 
     public class ChangeTrackingEntry<T> : ChangeTrackingEntry, IChangeTrackingEntry<T>
     {
-        public T Entity { get; }
+        public T Entry { get; }
 
         internal ChangeTrackingEntry(T entity,
             long? changeVersion,
@@ -31,12 +31,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
             string? changeContext) 
             : base(changeVersion, creationVersion, changeOperation, changeContext)
         {
-            Entity = entity;
+            Entry = entity;
         }
 
         public ChangeTrackingEntry<TNew> WithType<TNew>()
         {
-            if (Entity is TNew newEntity)
+            if (Entry is TNew newEntity)
                 return new ChangeTrackingEntry<TNew>(newEntity, ChangeVersion, CreationVersion, ChangeOperation, ChangeContext);
 
             throw new InvalidOperationException($"Type: {typeof(T).PrettyName()} cannot be converted to Type: {typeof(TNew).PrettyName()}");
