@@ -10,25 +10,25 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
         public const string EntityTablePrefix = "T";
         public const string ChangeTablePrefix = "CT";
 
-        public static string GetNextChangeVersionExpression(IEntityType entityType, string lastChangeVersionExpression)
+        public static string GetNextChangeVersionExpression(IEntityType entityType, long? lastChangedVersion)
         {
             var fullTableName = entityType.GetFullTableName();
 
-            var sql = $@"SELECT MIN(SYS_CHANGE_VERSION) FROM CHANGETABLE(CHANGES {fullTableName}, 0) AS {ChangeTablePrefix}
-                        WHERE SYS_CHANGE_VERSION > ({lastChangeVersionExpression})";
+            var sql = $@"SELECT MIN(SYS_CHANGE_VERSION) FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}
+                        WHERE SYS_CHANGE_VERSION > ({lastChangedVersion})";
 
             return sql;
         }
 
-        public static string GetNextChangeSetExpression(IEntityType entityType, string lastChangeVersionExpression)
+        public static string GetNextChangeSetExpression(IEntityType entityType, long? lastChangedVersion)
         {
-            var sql = $@"{GetAllChangeSetsExpression(entityType, false)}
-                         WHERE SYS_CHANGE_VERSION = ({GetNextChangeVersionExpression(entityType, lastChangeVersionExpression)})";
+            var sql = $@"{GetAllChangeSetsExpression(entityType, lastChangedVersion, false)}
+                         WHERE SYS_CHANGE_VERSION = ({GetNextChangeVersionExpression(entityType, lastChangedVersion)})";
 
             return sql;
         }
 
-        public static string GetAllChangeSetsExpression(IEntityType entityType, bool terminate, long version = 0)
+        public static string GetAllChangeSetsExpression(IEntityType entityType, long? lastChangedVersion, bool terminate)
         {
             var fullTableName = entityType.GetFullTableName();
 
@@ -37,7 +37,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
             var onExpression = GetJoinConditionExpression(entityType, EntityTablePrefix, ChangeTablePrefix);
 
             var sql = $@"SELECT {columnNames}
-                         FROM CHANGETABLE(CHANGES {fullTableName}, {version}) AS {ChangeTablePrefix}
+                         FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}
                          LEFT OUTER JOIN
                          {fullTableName} AS {EntityTablePrefix} ON ({onExpression})";
 
@@ -51,7 +51,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
         {
             StringBuilder sb = new StringBuilder();
 
-            
             //primary key columns
             sb.Append(string.Join(",", entityType.GetPrimaryKeyColumnNames(changeTablePrefix)));
 
@@ -84,7 +83,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
 
             //change table columns
             sb.Append("SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext");
-
 
             return sb.ToString();
         }

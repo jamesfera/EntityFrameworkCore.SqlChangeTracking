@@ -14,7 +14,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
         {
             Validate(entityType);
 
-            var sql = ChangeTableSqlStatements.GetNextChangeSetExpression(entityType, version.ToString());
+            var sql = ChangeTableSqlStatements.GetNextChangeSetExpression(entityType, version);
 
             return new AsyncEnumerableWrapper<T>(context.ToChangeSet<T>(sql), sql);
         }
@@ -23,7 +23,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
         {
             Validate(entityType);
 
-            var sql = ChangeTableSqlStatements.GetAllChangeSetsExpression(entityType, true, version);
+            var sql = ChangeTableSqlStatements.GetAllChangeSetsExpression(entityType, version, true);
 
             return new AsyncEnumerableWrapper<T>(context.ToChangeSet<T>(sql), sql);
         }
