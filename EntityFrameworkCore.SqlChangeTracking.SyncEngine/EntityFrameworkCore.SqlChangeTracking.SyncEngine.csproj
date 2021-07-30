@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <nullable>enable</nullable>
+    <Description>Extension library for Entity Framework Core to enable Sql Change Tracking</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EntityFrameworkCore.SqlChangeTracking\EntityFrameworkCore.SqlChangeTracking.csproj" />
+  </ItemGroup>
+
+</Project>

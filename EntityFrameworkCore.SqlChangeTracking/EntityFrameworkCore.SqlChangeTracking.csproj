@@ -5,11 +5,6 @@
     <LangVersion>latest</LangVersion>
     <nullable>enable</nullable>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Authors>James Fera</Authors>
-    <Company />
-    <RepositoryUrl>https://github.com/jamesfera/EntityFrameworkCore.SqlChangeTracking</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/jamesfera/EntityFrameworkCore.SqlChangeTracking</PackageProjectUrl>
     <Description>Extension library for Entity Framework Core to enable Sql Change Tracking</Description>
   </PropertyGroup>
 
