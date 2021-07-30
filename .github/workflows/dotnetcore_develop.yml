@@ -52,6 +52,7 @@ jobs:
 
       - name: Build with dotnet
         run: |
+          nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/lakesidelabs/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }} -StorePasswordInClearText
           dotnet tool install -g dotnet-setversion
           setversion -r $GITVERSION_FULLSEMVER
           dotnet build --configuration Release
