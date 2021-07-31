@@ -8,3 +8,4 @@
 
 [Read about Snapshot Isolation](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server)
 
+ 
