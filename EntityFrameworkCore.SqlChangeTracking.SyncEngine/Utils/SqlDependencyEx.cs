@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.Logging;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
@@ -442,7 +441,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
 
         private const int COMMAND_TIMEOUT = 60000;
 
-        private static readonly List<int> ActiveEntities = new List<int>();
+        private static readonly List<string> ActiveEntities = new List<string>();
 
         //private CancellationTokenSource _threadSource;
 
@@ -483,7 +482,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
 
         public bool DetailsIncluded { get; private set; }
 
-        public int Identity { get; private set; }
+        public string Identity { get; private set; }
 
         //public bool Active { get; private set; }
 
@@ -495,6 +494,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
         IDisposable _logScope;
 
         public SqlDependencyEx(
+            string identity,
             ILogger<SqlDependencyEx> logger,
             string connectionString,
             string databaseName,
@@ -502,8 +502,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
             string schemaName = "dbo",
             NotificationTypes listenerType =
                 NotificationTypes.Insert | NotificationTypes.Update | NotificationTypes.Delete,
-            bool receiveDetails = true, int identity = 1)
+            bool receiveDetails = true)
         {
+            if (string.IsNullOrWhiteSpace(identity))
+                throw new Exception("Identity must set.");
+
             Logger = logger;
             this.ConnectionString = connectionString;
             this.DatabaseName = databaseName;

@@ -26,8 +26,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
         ILogger<DatabaseChangeMonitor> _logger;
         ILoggerFactory _loggerFactory;
 
-        static int SqlDependencyIdentity = Assembly.GetEntryAssembly().GetHashCode();
-
         string _databaseName;
 
         ConcurrentDictionary<string, SqlDependencyEx> _sqlDependencies = new ConcurrentDictionary<string, SqlDependencyEx>();
@@ -49,6 +47,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
         public IDisposable RegisterForChanges(Action<DatabaseChangeMonitorRegistrationOptions> optionsBuilder, Func<ITableChangedNotification, Task> changeEventHandler)
         {
+            var assemblyName = Assembly.GetEntryAssembly().GetName().Name.Split(".");
+
+            var applicationName = assemblyName.Skip(assemblyName.Length - 1).FirstOrDefault();
+
             try
             {
                 _registrationSemaphore.Wait();
@@ -67,11 +69,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
                 _sqlDependencies.GetOrAdd(registrationKey, k =>
                 {
-                    var id = Interlocked.Increment(ref SqlDependencyIdentity);
+                    var id = $"{applicationName}_{options.TableName}".ToLowerInvariant();
 
                     var fullTableName = $"{options.SchemaName}.{options.TableName}";
 
-                    var sqlTableDependency = new SqlDependencyEx(_loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, options.DatabaseName, options.TableName, options.SchemaName, identity: SqlDependencyIdentity, receiveDetails: true);
+                    var sqlTableDependency = new SqlDependencyEx(id, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, options.DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
 
                     var notificationTask = sqlTableDependency.Start(TableChangedEventHandler, (sqlEx, ex) =>
                     {
@@ -82,7 +84,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
                     }, _cancellationTokenSource.Token, false).Result;
 
-                    _logger.LogInformation("Created Change Event Listener on table {TableName} with identity: {SqlDependencyId}", fullTableName, SqlDependencyIdentity);
+                    _logger.LogInformation("Created Change Event Listener on table {TableName} with identity: {SqlDependencyId}", fullTableName, id);
 
                     _notificationTasks = _notificationTasks.Add(notificationTask);
 
