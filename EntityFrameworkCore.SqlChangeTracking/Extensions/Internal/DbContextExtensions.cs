@@ -46,7 +46,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 _ => ChangeOperation.None
                 };
 
-            var entry = new ChangeTrackingEntry<T>(new T(), changeVersion, creationVersion, changeOperation, changeContext);
+            var entry = new ChangeTrackingEntry<T>(new T(), changeVersion, creationVersion, changeOperation, changeContext, entityType.GetFullTableName());
             
             var propertyLookup = entityType.GetProperties().ToDictionary(p => p.Name, p => p);
 

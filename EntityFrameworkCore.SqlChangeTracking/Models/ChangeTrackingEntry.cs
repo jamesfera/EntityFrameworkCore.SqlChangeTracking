@@ -13,6 +13,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
         long? CreationVersion { get; }
         ChangeOperation ChangeOperation { get; }
         string? ChangeContext { get; }
+        string TableName { get; }
     }
 
     public interface IChangeTrackingEntry<out T> : IChangeTrackingEntry
@@ -28,8 +29,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
             long? changeVersion,
             long? creationVersion,
             ChangeOperation changeOperation,
-            string? changeContext) 
-            : base(changeVersion, creationVersion, changeOperation, changeContext)
+            string? changeContext,
+            string tableName) 
+            : base(changeVersion, creationVersion, changeOperation, changeContext, tableName)
         {
             Entry = entity;
         }
@@ -37,7 +39,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
         public ChangeTrackingEntry<TNew> WithType<TNew>()
         {
             if (Entry is TNew newEntity)
-                return new ChangeTrackingEntry<TNew>(newEntity, ChangeVersion, CreationVersion, ChangeOperation, ChangeContext);
+                return new ChangeTrackingEntry<TNew>(newEntity, ChangeVersion, CreationVersion, ChangeOperation, ChangeContext, TableName);
 
             throw new InvalidOperationException($"Type: {typeof(T).PrettyName()} cannot be converted to Type: {typeof(TNew).PrettyName()}");
         }
@@ -45,12 +47,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
 
     public abstract class ChangeTrackingEntry : IChangeTrackingEntry
     {
-        protected ChangeTrackingEntry(long? changeVersion, long? creationVersion, ChangeOperation changeOperation, string? changeContext)
+        protected ChangeTrackingEntry(long? changeVersion, long? creationVersion, ChangeOperation changeOperation, string? changeContext, string tableName)
         {
             ChangeVersion = changeVersion;
             CreationVersion = creationVersion;
             ChangeOperation = changeOperation;
             ChangeContext = changeContext;
+            TableName = tableName;
         }
 
         public long? ChangeVersion { get; }
@@ -60,5 +63,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Models
         public ChangeOperation ChangeOperation { get; }
 
         public string? ChangeContext { get; }
+
+        public string TableName { get; }
     }
 }
