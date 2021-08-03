@@ -1,9 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Options;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
@@ -12,18 +11,20 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
     {
         string SyncContext { get; }
         Type DbContextType { get; }
+
+        public IReadOnlyList<IEntityType> SyncEntityTypes { get; }
+
         Task ProcessAllChanges();
         Task ProcessChanges(IEntityType entityType);
+
         Task ProcessChanges<TEntity>();
         Task ProcessChanges(Type clrEntityType);
 
-        Task ResetAllSyncVersions();
-        Task MarkAllEntitiesAsSynced();
+        Task SetChangeVersion(string entityName, long changeVersion);
+        Task SetChangeVersion(IEntityType entityType, long changeVersion);
 
-        //Task SetChangeVersion(IEntityType entityType, long changeVersion);
-
+        Task MarkEntityAsSynced(string entityName);
         Task MarkEntityAsSynced(IEntityType entityType);
-        Task ResetSyncVersionForEntity(IEntityType entityType);
 
         Task Start(CancellationToken cancellationToken);
         Task Stop(CancellationToken cancellationToken);

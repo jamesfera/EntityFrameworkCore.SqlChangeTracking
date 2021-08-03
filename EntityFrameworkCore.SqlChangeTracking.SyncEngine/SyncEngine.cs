@@ -26,6 +26,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         List<IEntityType> _syncEngineEntityTypes = new List<IEntityType>();
 
+        public IReadOnlyList<IEntityType> SyncEntityTypes => _syncEngineEntityTypes;
+
         public string SyncContext { get; }
         public Type DbContextType => typeof(TContext);
 
@@ -166,28 +168,30 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             return ProcessChanges(entityType);
         }
 
-        public async Task MarkAllEntitiesAsSynced()
-        {
-            using var serviceScope = _serviceScopeFactory.CreateScope();
+        //public async Task MarkAllEntitiesAsSynced()
+        //{
+        //    using var serviceScope = _serviceScopeFactory.CreateScope();
 
-            await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
+        //    await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
 
-            var currentVersion = await dbContext.GetCurrentChangeTrackingVersion();
+        //    var currentVersion = await dbContext.GetCurrentChangeTrackingVersion();
 
-            if (!currentVersion.HasValue)
-            {
-                _logger.LogWarning("Change Tracking is not enabled for this database");
-                return;
-            }
+        //    if (!currentVersion.HasValue)
+        //    {
+        //        _logger.LogWarning("Change Tracking is not enabled for this database");
+        //        return;
+        //    }
 
-            foreach (var syncEngineEntityType in _syncEngineEntityTypes)
-            {
-                await dbContext.SetLastChangedVersionAsync(syncEngineEntityType, SyncContext, currentVersion.Value);
-            }
-        }
+        //    foreach (var syncEngineEntityType in _syncEngineEntityTypes)
+        //    {
+        //        await dbContext.SetLastChangedVersionAsync(syncEngineEntityType, SyncContext, currentVersion.Value);
+        //    }
+        //}
 
         public async Task MarkEntityAsSynced(IEntityType entityType)
         {
+            validateEntityType(entityType);
+
             using var serviceScope = _serviceScopeFactory.CreateScope();
 
             await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
@@ -199,36 +203,36 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                 _logger.LogWarning("Change Tracking is not enabled for this database");
                 return;
             }
-
-            if (!_syncEngineEntityTypes.Contains(entityType))
-                throw new InvalidOperationException($"Entity Type: {entityType} does not have sync engine enabled.");
 
             await dbContext.SetLastChangedVersionAsync(entityType, SyncContext, currentVersion.Value);
         }
 
-        public async Task ResetAllSyncVersions()
+        public Task MarkEntityAsSynced(string entityName) => MarkEntityAsSynced(validateEntityName(entityName));
+
+        //public async Task ResetAllChangeVersions()
+        //{
+        //    using var serviceScope = _serviceScopeFactory.CreateScope();
+
+        //    await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
+
+        //    foreach (var syncEngineEntityType in _syncEngineEntityTypes)
+        //    {
+        //        await dbContext.SetLastChangedVersionAsync(syncEngineEntityType, SyncContext, 0);
+        //    }
+        //}
+
+        public async Task SetChangeVersion(IEntityType entityType, long changeVersion)
         {
+            validateEntityType(entityType);
+
             using var serviceScope = _serviceScopeFactory.CreateScope();
 
             await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
 
-            foreach (var syncEngineEntityType in _syncEngineEntityTypes)
-            {
-                await dbContext.SetLastChangedVersionAsync(syncEngineEntityType, SyncContext, 0);
-            }
+            await dbContext.SetLastChangedVersionAsync(entityType, SyncContext, changeVersion);
         }
 
-        public async Task ResetSyncVersionForEntity(IEntityType entityType)
-        {
-            using var serviceScope = _serviceScopeFactory.CreateScope();
-
-            await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
-
-            if (!_syncEngineEntityTypes.Contains(entityType))
-                throw new InvalidOperationException($"Entity Type: {entityType} does not have sync engine enabled.");
-
-            await dbContext.SetLastChangedVersionAsync(entityType, SyncContext, 0);
-        }
+        public Task SetChangeVersion(string entityName, long changeVersion) => SetChangeVersion(validateEntityName(entityName), changeVersion);
 
         public Task Stop(CancellationToken cancellationToken)
         {
@@ -239,6 +243,24 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             _started = false;
 
             return Task.CompletedTask;
+        }
+
+        IEntityType validateEntityName(string entityName)
+        {
+            var entityType = _syncEngineEntityTypes.FirstOrDefault(e => e.ClrType.Name.Equals(entityName));
+
+            if (entityType == null)
+                throw new InvalidOperationException($"Entity Type: {entityName} does not have sync engine enabled.");
+
+            validateEntityType(entityType);
+
+            return entityType;
+        }
+
+        void validateEntityType(IEntityType entityType)
+        {
+            if (!_syncEngineEntityTypes.Any(e => e == entityType))
+                throw new InvalidOperationException($"Entity Type: {entityType} does not have sync engine enabled.");
         }
     }
 }
