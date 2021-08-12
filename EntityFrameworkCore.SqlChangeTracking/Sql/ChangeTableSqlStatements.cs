@@ -22,8 +22,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
 
         public static string GetNextChangeSetExpression(IEntityType entityType, long? lastChangedVersion)
         {
-            var sql = $@"{GetAllChangeSetsExpression(entityType, lastChangedVersion, false)}
-                         WHERE SYS_CHANGE_VERSION = ({GetNextChangeVersionExpression(entityType, lastChangedVersion)})";
+            var allChangesSql = GetAllChangeSetsExpression(entityType, lastChangedVersion, false);
+
+            var sql = $@"{allChangesSql}
+                            {(allChangesSql.Contains("WHERE") ? "AND" : "WHERE")} SYS_CHANGE_VERSION = ({GetNextChangeVersionExpression(entityType, lastChangedVersion)})";
 
             return sql;
         }
@@ -39,7 +41,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
             var sql = $@"SELECT {columnNames}
                          FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}
                          LEFT OUTER JOIN
-                         {fullTableName} AS {EntityTablePrefix} ON ({onExpression})";
+                         {fullTableName} AS {EntityTablePrefix} ON ({onExpression})
+                         ";
+
+            var discriminatorProperty = entityType.GetDiscriminatorProperty();
+
+            if (discriminatorProperty != null)
+            {
+                var discriminatorValue = entityType.GetDiscriminatorValue();
+                sql += $" WHERE {discriminatorProperty.Name} = '{discriminatorValue}'";
+            }
 
             if (terminate)
                 sql += " ORDER BY SYS_CHANGE_VERSION";
