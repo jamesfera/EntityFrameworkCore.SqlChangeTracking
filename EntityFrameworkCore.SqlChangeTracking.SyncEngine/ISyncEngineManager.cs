@@ -41,7 +41,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             var syncEngine = _syncEngineInstances.GetOrAdd(key, k => new SyncEngine<TContext>(
                 syncContext,
                 _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
-                _serviceProvider.GetRequiredService<IDatabaseChangeMonitor>(),
+                _serviceProvider.GetRequiredService<IDatabaseChangeMonitorManager>(),
                 _serviceProvider.GetRequiredService<IChangeSetProcessor<TContext>>(),
                 _serviceProvider.GetService<ILogger<SyncEngine<TContext>>>()));
 

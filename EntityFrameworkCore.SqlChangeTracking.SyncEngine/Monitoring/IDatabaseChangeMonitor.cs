@@ -3,8 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
@@ -14,11 +12,90 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 {
+    public interface IDatabaseChangeMonitorManager
+    {
+        IDatabaseChangeMonitor GetChangeMonitor(string databaseName, bool createIfNotExist = false);
+
+        IEnumerable<IDatabaseChangeMonitor> GetAllChangeMonitors();
+
+        void PauseAll();
+        void ResumeAll();
+
+        Task EnableAll();
+        Task DisableAll();
+    }
+
+    class DatabaseChangeMonitorManager : IDatabaseChangeMonitorManager
+    {
+        ConcurrentDictionary<string, IDatabaseChangeMonitor> _changeMonitorsDictionary = new ConcurrentDictionary<string, IDatabaseChangeMonitor>();
+
+        ILoggerFactory _loggerFactory;
+
+        public DatabaseChangeMonitorManager(ILoggerFactory loggerFactory)
+        {
+            _loggerFactory = loggerFactory;
+        }
+
+        public IDatabaseChangeMonitor GetChangeMonitor(string databaseName, bool createIfNotExist)
+        {
+            return _changeMonitorsDictionary.GetOrAdd(databaseName, d =>
+            {
+                if (createIfNotExist)
+                    return new DatabaseChangeMonitor(databaseName, _loggerFactory);
+
+                throw new Exception($"Change Monitor for Database {databaseName} not found");
+            });
+        }
+
+        public IEnumerable<IDatabaseChangeMonitor> GetAllChangeMonitors()
+        {
+            return _changeMonitorsDictionary.Values;
+        }
+
+        public void PauseAll()
+        {
+            foreach (var databaseChangeMonitor in _changeMonitorsDictionary.Values)
+            {
+                databaseChangeMonitor.Pause();
+            }
+        }
+
+        public void ResumeAll()
+        {
+            foreach (var databaseChangeMonitor in _changeMonitorsDictionary.Values)
+            {
+                databaseChangeMonitor.Resume();
+            }
+        }
+
+        public async Task EnableAll()
+        {
+            foreach (var databaseChangeMonitor in _changeMonitorsDictionary.Values)
+            {
+                await databaseChangeMonitor.Enable();
+            }
+        }
+
+        public async Task DisableAll()
+        {
+            foreach (var databaseChangeMonitor in _changeMonitorsDictionary.Values)
+            {
+                await databaseChangeMonitor.Disable();
+            }
+        }
+    }
+
     public interface IDatabaseChangeMonitor
     {
-        IDisposable RegisterForChanges(Action<DatabaseChangeMonitorRegistrationOptions> optionsBuilder, Func<ITableChangedNotification, Task> changeEventHandler);
-        void Enable();
-        void Disable();
+        IAsyncDisposable RegisterForChanges(Action<DatabaseChangeMonitorRegistrationOptions> optionsBuilder);
+
+        string DatabaseName { get; }
+
+        void Pause();
+        void Resume();
+
+        Task Enable();
+        Task Disable();
     }
 
     public class DatabaseChangeMonitor : IDatabaseChangeMonitor, IAsyncDisposable
@@ -26,89 +103,110 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
         ILogger<DatabaseChangeMonitor> _logger;
         ILoggerFactory _loggerFactory;
 
-        string _databaseName;
+        public string DatabaseName { get; }
 
-        ConcurrentDictionary<string, SqlDependencyEx> _sqlDependencies = new ConcurrentDictionary<string, SqlDependencyEx>();
+        ConcurrentDictionary<string, Task<SqlDependencyEx>> _sqlDependencies = new ConcurrentDictionary<string, Task<SqlDependencyEx>>();
         ConcurrentDictionary<string, ImmutableList<ChangeRegistration>> _registeredChangeActions = new ConcurrentDictionary<string, ImmutableList<ChangeRegistration>>();
 
-        CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        bool _paused = true;
 
-        ImmutableList<Task> _notificationTasks = ImmutableList<Task>.Empty;
-
-        bool _enabled = true;
-
-        public DatabaseChangeMonitor(ILoggerFactory loggerFactory = null)
+        protected internal DatabaseChangeMonitor(string databaseName, ILoggerFactory loggerFactory = null)
         {
             _logger = loggerFactory?.CreateLogger<DatabaseChangeMonitor>() ?? NullLogger<DatabaseChangeMonitor>.Instance;
             _loggerFactory = loggerFactory;
+
+            DatabaseName = databaseName;
         }
 
-        static SemaphoreSlim _registrationSemaphore = new SemaphoreSlim(1,1);
-
-        public IDisposable RegisterForChanges(Action<DatabaseChangeMonitorRegistrationOptions> optionsBuilder, Func<ITableChangedNotification, Task> changeEventHandler)
+        public IAsyncDisposable RegisterForChanges(Action<DatabaseChangeMonitorRegistrationOptions> optionsBuilder)
         {
-            var assemblyName = Assembly.GetEntryAssembly().GetName().Name.Split(".");
+            var options = new DatabaseChangeMonitorRegistrationOptions();
 
-            var applicationName = assemblyName.Skip(assemblyName.Length - 1).FirstOrDefault();
+            optionsBuilder.Invoke(options);
 
-            try
+            if (string.IsNullOrWhiteSpace(options.ApplicationName))
+                throw new ArgumentNullException(nameof(DatabaseChangeMonitorRegistrationOptions.ApplicationName));
+
+            if (string.IsNullOrWhiteSpace(options.TableName))
+                throw new ArgumentNullException(nameof(DatabaseChangeMonitorRegistrationOptions.TableName));
+
+            if (string.IsNullOrWhiteSpace(options.ConnectionString))
+                throw new ArgumentNullException(nameof(DatabaseChangeMonitorRegistrationOptions.ConnectionString));
+
+            if (string.IsNullOrWhiteSpace(options.SchemaName))
+                throw new ArgumentNullException(nameof(DatabaseChangeMonitorRegistrationOptions.SchemaName));
+
+            if (options.OnTableChanged == null)
+                throw new ArgumentNullException(nameof(DatabaseChangeMonitorRegistrationOptions.OnTableChanged));
+
+            var changeRegistration = new ChangeRegistration(options, async registration =>
             {
-                _registrationSemaphore.Wait();
+                var registrations = _registeredChangeActions.AddOrUpdate(registration.RegistrationKey, new List<ChangeRegistration>().ToImmutableList(), (k, l) => l.Remove(registration));
 
-                var options = new DatabaseChangeMonitorRegistrationOptions();
+                if (!registrations.Any())
+                    await removeTableChangeListener(registration.RegistrationKey);
+            });
 
-                optionsBuilder.Invoke(options);
+            _registeredChangeActions.AddOrUpdate(changeRegistration.RegistrationKey, new List<ChangeRegistration>(new[] { changeRegistration }).ToImmutableList(), (k, r) => r.Add(changeRegistration));
 
-                _databaseName = options.DatabaseName;
+            return changeRegistration;
+        }
 
-                var registrationKey = $"{options.DatabaseName}.{options.SchemaName}.{options.TableName}";
+        public void Pause()
+        {
+            _logger.LogInformation("Change Notifications Paused for Database: {DatabaseName}", DatabaseName);
+            _paused = true;
+        }
 
-                var registration = new ChangeRegistration(registrationKey, _registeredChangeActions, changeEventHandler);
+        public void Resume()
+        {
+            _logger.LogInformation("Change Notifications Resumed for Database: {DatabaseName}", DatabaseName);
+            _paused = false;
+        }
 
-                _registeredChangeActions.AddOrUpdate(registrationKey, new List<ChangeRegistration>(new[] {registration}).ToImmutableList(), (k, r) => r.Add(registration));
+        public async Task Enable()
+        {
+            foreach (var changeRegistration in _registeredChangeActions.Values.SelectMany(v => v))
+            {
+                var registrationKey = changeRegistration.RegistrationKey;
 
-                _sqlDependencies.GetOrAdd(registrationKey, k =>
+                var options = changeRegistration.Options;
+
+                await _sqlDependencies.GetOrAdd(registrationKey, async k =>
                 {
-                    var id = $"{applicationName}_{options.TableName}".ToLowerInvariant();
-
                     var fullTableName = $"{options.SchemaName}.{options.TableName}";
 
-                    var sqlTableDependency = new SqlDependencyEx(id, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, options.DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
+                    var sqlTableDependency = new SqlDependencyEx(registrationKey, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
 
-                    var notificationTask = sqlTableDependency.Start(TableChangedEventHandler, (sqlEx, ex) =>
+                    await sqlTableDependency.Start(TableChangedEventHandler, async (sqlEx, ex) =>
                     {
-                        if (ex == null)
-                            _logger.LogInformation("Table change listener terminated for table: {TableName} database: {DatabaseName}", fullTableName, options.DatabaseName);
-                        else
-                            _logger.LogCritical(ex, "Table change listener terminated for table: {TableName} database: {DatabaseName}", fullTableName, options.DatabaseName);
+                        if (changeRegistration.Options.OnChangeMonitorTerminated != null)
+                            await changeRegistration.Options.OnChangeMonitorTerminated.Invoke(this, fullTableName, options.ApplicationName, ex);
+                    });
 
-                    }, _cancellationTokenSource.Token, false).Result;
-
-                    _logger.LogInformation("Created Change Event Listener on table {TableName} with identity: {SqlDependencyId}", fullTableName, id);
-
-                    _notificationTasks = _notificationTasks.Add(notificationTask);
+                    _logger.LogInformation("Created Change Event Listener in Database: {DatabaseName} for table {TableName} with identity: {SqlDependencyId}", DatabaseName, fullTableName, registrationKey);
 
                     return sqlTableDependency;
                 });
-
-                return registration;
             }
-            finally
+        }
+
+        public async Task Disable()
+        {
+            foreach (var registrationKey in _sqlDependencies.Keys)
             {
-                _registrationSemaphore.Release();
+                await removeTableChangeListener(registrationKey);
             }
         }
 
-        public void Enable()
+        async Task removeTableChangeListener(string registrationKey)
         {
-            _logger.LogInformation("Change Notifications Enabled for Database: {DatabaseName}", _databaseName);
-            _enabled = true;
-        }
+            if (!_sqlDependencies.TryRemove(registrationKey, out Task<SqlDependencyEx> sqlExTask))
+                return;
 
-        public void Disable()
-        {
-            _logger.LogInformation("Change Notifications Disabled for Database: {DatabaseName}", _databaseName);
-            _enabled = false;
+            var sqlEx = sqlExTask.Result;
+
+            await sqlEx.Stop();
         }
 
         async Task TableChangedEventHandler(SqlDependencyEx sqlEx, SqlDependencyEx.TableChangedEventArgs e)
@@ -119,15 +217,15 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
             {
                 tableName = $"{sqlEx.SchemaName}.{sqlEx.TableName}";
 
-                if (!_enabled)
+                if (!_paused)
                 {
-                    _logger.LogDebug("Database Change Monitor disabled.  Skipping change notification for table: {TableName}", tableName);
+                    _logger.LogDebug("Database Change Monitor paused.  Skipping change notification for table: {TableName}", tableName);
                     return;
                 }
 
                 _logger.LogDebug("Change detected in table: {TableName} ", tableName);
 
-                var registrationKey = $"{sqlEx.DatabaseName}.{sqlEx.SchemaName}.{sqlEx.TableName}";
+                var registrationKey = sqlEx.Identity;
 
                 if (_registeredChangeActions.TryGetValue(registrationKey, out ImmutableList<ChangeRegistration> actions))
                 {
@@ -158,7 +256,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
                 }
                 else //this should never happen
                 {
-                    _logger.LogWarning("Log a warning here");
+                    _logger.LogWarning("Unable to process Table Changed Event. No Change Registration found for Key: {RegistrationKey}", registrationKey);
                 }
             }
             catch (Exception ex)
@@ -167,54 +265,55 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
             }
         }
 
-        bool _disposed = false;
+        bool _disposed;
         public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
+                await Disable();
+
+                _registeredChangeActions = null;
+
                 _disposed = true;
-
-                _cancellationTokenSource.Cancel();
-
-                foreach (var sqlDependencyEx in _sqlDependencies.Values)
-                {
-                    await sqlDependencyEx.DisposeAsync().ConfigureAwait(false);
-                }
-
-                //_sqlDependencies?.Clear();
-
-                _cancellationTokenSource.Dispose();
             }
         }
 
-        class ChangeRegistration : IDisposable
+        class ChangeRegistration : IAsyncDisposable
         {
-            ConcurrentDictionary<string, ImmutableList<ChangeRegistration>> _registeredChangeActions;
-            string _registrationKey;
+            public string RegistrationKey { get; }
 
-            public Func<ITableChangedNotification, Task> ChangeFunc { get; }
+            public DatabaseChangeMonitorRegistrationOptions Options { get; }
 
-            public ChangeRegistration(string registrationKey, ConcurrentDictionary<string, ImmutableList<ChangeRegistration>> registeredChangeActions, Func<ITableChangedNotification, Task> changeFunc)
+            public Func<ITableChangedNotification, Task> ChangeFunc => Options.OnTableChanged;
+
+            Func<ChangeRegistration, Task> _registrationRemovedAction;
+
+            public ChangeRegistration(DatabaseChangeMonitorRegistrationOptions options, Func<ChangeRegistration, Task> registrationRemovedAction)
             {
-                _registrationKey = registrationKey;
-                _registeredChangeActions = registeredChangeActions;
-                ChangeFunc = changeFunc;
+                Options = options;
+
+                RegistrationKey = $"{options.ApplicationName}_{options.SchemaName}_{options.TableName}".ToLowerInvariant();
+
+                _registrationRemovedAction = registrationRemovedAction;
             }
 
-            public void Dispose()
+            public async ValueTask DisposeAsync()
             {
-                _registeredChangeActions.AddOrUpdate(_registrationKey, new List<ChangeRegistration>().ToImmutableList(), (k, l) => l.Remove(this));
+                await _registrationRemovedAction(this);
             }
         }
     }
 
     public class DatabaseChangeMonitorRegistrationOptions
     {
-        public string TableName { get; set; }
-        public string SchemaName { get; set; }
-        public string DatabaseName { get; set; }
-        public string ConnectionString { get; set; }
-    }
+        public string ApplicationName { get; set; }
 
-    
+        public string TableName { get; set; }
+        public string SchemaName { get; set; } = "dbo";
+        public string ConnectionString { get; set; }
+
+        public Func<ITableChangedNotification, Task> OnTableChanged { get; set; }
+
+        public Func<IDatabaseChangeMonitor, string, string, Exception?, Task>? OnChangeMonitorTerminated { get; set; }
+    }
 }

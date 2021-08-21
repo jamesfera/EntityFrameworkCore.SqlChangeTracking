@@ -16,10 +16,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
     {
         public static IServiceCollection AddSyncEngine<TContext>(this IServiceCollection services, string syncContext, Func<Type, bool> processorTypePredicateFunc, params Assembly[] assembliesToScan) where TContext : DbContext
         {
-            services.TryAddScoped<IChangeSetBatchProcessorFactory<TContext>, ChangeSetBatchProcessorFactory<TContext>>(); 
+            services.TryAddScoped<IChangeSetBatchProcessorFactory<TContext>, ChangeSetBatchProcessorFactory<TContext>>();
             //services.TryAddScoped<IBatchProcessorManager<TContext>, BatchProcessorManager<TContext>>();
 
-            services.TryAddSingleton<IDatabaseChangeMonitor, DatabaseChangeMonitor>();
+            services.TryAddSingleton<IDatabaseChangeMonitorManager, DatabaseChangeMonitorManager>();
+            
             services.TryAddSingleton<IChangeSetProcessor<TContext>, ChangeSetProcessor<TContext>>();
             services.TryAddSingleton<IProcessorTypeRegistry<TContext>, ProcessorTypeRegistry<TContext>>();
 

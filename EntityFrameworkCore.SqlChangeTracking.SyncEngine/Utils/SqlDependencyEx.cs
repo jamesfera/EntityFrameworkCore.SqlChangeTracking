@@ -517,14 +517,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
             this.Identity = identity;
         }
 
-        public Task Start(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction = null)
-        {
-            return Start(tableChangedAction, stoppedAction, CancellationToken.None);
-        }
-
         public Task NotificationTask { get; private set; }
+        CancellationTokenSource? _cancellationTokenSource;
 
-        public async Task<Task> Start(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction, CancellationToken cancellationToken, bool stopOnError = true)
+        public async Task Start(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction = null)
         {
             //_logScope = Logger.BeginScope(new List<KeyValuePair<string, object>>()
             //{
@@ -548,11 +544,17 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
 
             await InstallNotification().ConfigureAwait(false);
 
-            return NotificationLoop(tableChangedAction, stoppedAction, cancellationToken, stopOnError);
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            NotificationTask = NotificationLoop(tableChangedAction, stoppedAction, _cancellationTokenSource.Token);
         }
 
-        public async ValueTask Stop(CancellationToken cancellationToken)
+        public async ValueTask Stop()
         {
+            _cancellationTokenSource?.Cancel();
+
+            _cancellationTokenSource = null;
+
             _logScope?.Dispose();
 
             await UninstallNotification().ConfigureAwait(false);
@@ -564,10 +566,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
 
         public async ValueTask DisposeAsync()
         { 
-            await Stop(CancellationToken.None);
+            await Stop();
         }
 
-        async Task NotificationLoop(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction, CancellationToken cancellationToken, bool stopOnError)
+        async Task NotificationLoop(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction, CancellationToken cancellationToken)
         {
             var commandText = string.Format(
                 SQL_FORMAT_RECEIVE_EVENT,
@@ -576,8 +578,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                 COMMAND_TIMEOUT / 2,
                 this.SchemaName);
 
-            DateTime lastAttemptTime = DateTime.MinValue;
-
             while (true)
             {
                 try
@@ -585,8 +585,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         Logger.LogTrace("Waiting for Sql Server Receive Event...");
-
-                        lastAttemptTime = DateTime.Now;
 
                         var message = await ReceiveEvent(commandText, cancellationToken).ConfigureAwait(false);
 
@@ -615,12 +613,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                         }
                     }
 
-                    if (stopOnError)
-                    {
-                        stoppedAction?.Invoke(this, ex);
-                        return;
-                    }
-
                     using var logContext = Logger.BeginScope(new List<KeyValuePair<string, object>>()
                     {
                         new KeyValuePair<string, object>("SqlEx:Identity", Identity),
@@ -628,12 +620,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
 
                     Logger.LogError(ex, "Error in Sql Notification Loop for Database: {DatabaseName} Table: {TableName}", DatabaseName, TableName);
 
-                    var lastAttempt = DateTime.Now - lastAttemptTime;
-
-                    if (lastAttempt < TimeSpan.FromSeconds(30))
-                        await Task.Delay(TimeSpan.FromSeconds(30) - lastAttempt);
-
-                    Logger.LogWarning("Attempting to restart Table Change Listener Notification Loop for Database: {DatabaseName} Table: {TableName}", DatabaseName, TableName);
+                    stoppedAction?.Invoke(this, ex);
                 }
             }
         }

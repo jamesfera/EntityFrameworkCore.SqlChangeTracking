@@ -68,7 +68,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                 if (value != null)
                     readerValue = valueConverter(value);
 
-                propertyInfo.SetValue(entry.Entry, readerValue);
+                try
+                {
+                    propertyInfo.SetValue(entry.Entry, readerValue);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Error attempting to set value for property: {propertyInfo.Name} on type: {typeof(T).FullName} value: {readerValue?.ToString()}", ex);
+                }
             }
 
             return entry;

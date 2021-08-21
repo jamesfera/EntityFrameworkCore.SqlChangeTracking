@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
@@ -20,9 +21,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         ILogger<SyncEngine<TContext>> _logger;
         IServiceScopeFactory _serviceScopeFactory;
         IChangeSetProcessor<TContext> _changeSetProcessor;
-        IDatabaseChangeMonitor _databaseChangeMonitor;
+        IDatabaseChangeMonitorManager _databaseChangeMonitorManager;
 
-        List<IDisposable> _changeRegistrations = new List<IDisposable>();
+        List<IAsyncDisposable> _changeRegistrations = new List<IAsyncDisposable>();
 
         List<IEntityType> _syncEngineEntityTypes = new List<IEntityType>();
 
@@ -36,13 +37,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         public SyncEngine(
             string syncContext,
             IServiceScopeFactory serviceScopeFactory,
-            IDatabaseChangeMonitor databaseChangeMonitor,
+            IDatabaseChangeMonitorManager databaseChangeMonitorManager,
             IChangeSetProcessor<TContext> changeSetProcessor,
             ILogger<SyncEngine<TContext>> logger = null)
         {
             SyncContext = syncContext;
             _serviceScopeFactory = serviceScopeFactory;
-            _databaseChangeMonitor = databaseChangeMonitor;
+            _databaseChangeMonitorManager = databaseChangeMonitorManager;
             _changeSetProcessor = changeSetProcessor;
             _logger = logger ?? NullLogger<SyncEngine<TContext>>.Instance;
         }
@@ -99,26 +100,45 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 _logger.LogInformation("Found {EntityTrackingCount} Entities with Sync Engine enabled for SyncContext: {SyncContext}", _syncEngineEntityTypes.Count, SyncContext);
 
+                var databaseChangeMonitor = _databaseChangeMonitorManager.GetChangeMonitor(databaseName, true);
+
+                var assemblyName = Assembly.GetEntryAssembly().GetName().Name.Split(".");
+
+                var applicationName = assemblyName.Skip(assemblyName.Length - 1).FirstOrDefault();
+
                 foreach (var entityType in _syncEngineEntityTypes)
                 {
-                    var changeRegistration = _databaseChangeMonitor.RegisterForChanges(o =>
+                    var changeRegistration = databaseChangeMonitor.RegisterForChanges(o =>
                         {
+                            o.ApplicationName = applicationName;
                             o.TableName = entityType.GetTableName();
                             o.SchemaName = entityType.GetActualSchema();
-                            o.DatabaseName = databaseName;
                             o.ConnectionString = connectionString;
-                        },
-                        t =>
-                        {
-                            _logger.LogDebug("Received Change notification for Table: {TableName}", entityType.GetFullTableName());
 
-                            return ProcessChanges(entityType);
+                            o.OnTableChanged = n =>
+                            {
+                                _logger.LogDebug("Received Change notification for Table: {TableName} in Database: {DatabaseName}", n.Table, n.Database);
+
+                                return ProcessChanges(entityType);
+                            };
+
+                            o.OnChangeMonitorTerminated = (monitor, table, application, ex) =>
+                            {
+                                if (ex == null)
+                                    _logger.LogInformation("Table change listener terminated for table: {TableName} database: {DatabaseName}", table, monitor.DatabaseName);
+                                else
+                                    _logger.LogCritical(ex, "Table change listener terminated for table: {TableName} database: {DatabaseName}", table, monitor.DatabaseName);
+
+                                return Task.CompletedTask;
+                            };
                         });
 
                     _changeRegistrations.Add(changeRegistration);
 
                     _logger.LogInformation("Sync Engine configured for Entity: {EntityTypeName} on Table: {TableName}", entityType.Name, entityType.GetFullTableName());
                 }
+
+                await databaseChangeMonitor.Enable();
             }
             catch (Exception ex)
             {
@@ -168,26 +188,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             return ProcessChanges(entityType);
         }
 
-        //public async Task MarkAllEntitiesAsSynced()
-        //{
-        //    using var serviceScope = _serviceScopeFactory.CreateScope();
-
-        //    await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
-
-        //    var currentVersion = await dbContext.GetCurrentChangeTrackingVersion();
-
-        //    if (!currentVersion.HasValue)
-        //    {
-        //        _logger.LogWarning("Change Tracking is not enabled for this database");
-        //        return;
-        //    }
-
-        //    foreach (var syncEngineEntityType in _syncEngineEntityTypes)
-        //    {
-        //        await dbContext.SetLastChangedVersionAsync(syncEngineEntityType, SyncContext, currentVersion.Value);
-        //    }
-        //}
-
         public async Task MarkEntityAsSynced(IEntityType entityType)
         {
             validateEntityType(entityType);
@@ -209,18 +209,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         public Task MarkEntityAsSynced(string entityName) => MarkEntityAsSynced(validateEntityName(entityName));
 
-        //public async Task ResetAllChangeVersions()
-        //{
-        //    using var serviceScope = _serviceScopeFactory.CreateScope();
-
-        //    await using var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
-
-        //    foreach (var syncEngineEntityType in _syncEngineEntityTypes)
-        //    {
-        //        await dbContext.SetLastChangedVersionAsync(syncEngineEntityType, SyncContext, 0);
-        //    }
-        //}
-
         public async Task SetChangeVersion(IEntityType entityType, long changeVersion)
         {
             validateEntityType(entityType);
@@ -234,15 +222,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         public Task SetChangeVersion(string entityName, long changeVersion) => SetChangeVersion(validateEntityName(entityName), changeVersion);
 
-        public Task Stop(CancellationToken cancellationToken)
+        public async Task Stop(CancellationToken cancellationToken)
         {
-            _changeRegistrations.ForEach(r => r.Dispose());
+            foreach (var changeRegistration in _changeRegistrations)
+            {
+                await changeRegistration.DisposeAsync();
+            }
 
             _logger.LogInformation("Shutting down Sync Engine.");
 
             _started = false;
-
-            return Task.CompletedTask;
         }
 
         IEntityType validateEntityName(string entityName)
