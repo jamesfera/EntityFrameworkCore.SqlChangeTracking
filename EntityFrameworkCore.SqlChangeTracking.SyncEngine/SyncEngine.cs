@@ -72,15 +72,17 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                     return;
                 }
 
+                var processorRegistry = serviceScope.ServiceProvider.GetRequiredService<IProcessorTypeRegistry<TContext>>();
+
                 _logger.LogInformation("Initializing Sync Engine with SyncContext: {SyncContext}", SyncContext);
 
-                _syncEngineEntityTypes = dbContext.Model.GetEntityTypes().Where(e => e.IsSyncEngineEnabled() && !e.IsAbstract()).ToList();
+                _syncEngineEntityTypes = dbContext.Model.GetEntityTypes().Where(e => e.IsSyncEngineEnabled() && !e.IsAbstract() && processorRegistry.HasBatchProcessor(e.ClrType, SyncContext)).ToList();
 
                 var abstractSyncTypes = dbContext.Model.GetEntityTypes().Where(e => e.IsSyncEngineEnabled() && e.IsAbstract()).ToList();
 
                 foreach (var entityType in abstractSyncTypes)
                 {
-                    foreach (var type in entityType.GetConcreteDerivedTypesInclusive())
+                    foreach (var type in entityType.GetConcreteDerivedTypesInclusive().Where(e => processorRegistry.HasBatchProcessor(e.ClrType, SyncContext)))
                     {
                         _syncEngineEntityTypes.Add(type);
                     }
@@ -92,12 +94,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 var connectionString = dbContext.Database.GetDbConnection().ConnectionString;
 
-                var processorRegistry = serviceScope.ServiceProvider.GetRequiredService<IProcessorTypeRegistry<TContext>>();
-                
                 foreach (var syncEngineEntityType in _syncEngineEntityTypes)
                 {
-                    if (processorRegistry.HasBatchProcessor(syncEngineEntityType.ClrType, SyncContext))
-                        await dbContext.InitializeSyncEngine(syncEngineEntityType, SyncContext).ConfigureAwait(false);
+                    await dbContext.InitializeSyncEngine(syncEngineEntityType, SyncContext).ConfigureAwait(false);
                 }
 
                 serviceScope.Dispose();
