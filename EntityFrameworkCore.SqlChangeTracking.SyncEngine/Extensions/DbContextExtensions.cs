@@ -145,7 +145,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
             return new ValueTask(db.Database.ExecuteSqlRawAsync(sqlString));
         }
 
-        public static ValueTask InitializeSyncEngine(this DbContext dbContext, IEntityType entityType, string syncContext, bool markAllSynced = false)
+        internal static ValueTask InitializeSyncEngine(this DbContext dbContext, IEntityType entityType, string syncContext, bool markAllSynced = false)
         {
             var initialVersionString = markAllSynced ? "(SELECT CHANGE_TRACKING_CURRENT_VERSION())" : "0";
 

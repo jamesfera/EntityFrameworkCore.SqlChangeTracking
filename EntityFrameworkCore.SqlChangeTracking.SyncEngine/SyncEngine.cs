@@ -59,6 +59,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
 
+
                 if (!dbContext.Database.IsSqlServer())
                 {
                     var ex = new InvalidOperationException("Sync Engine is only compatible with Sql Server.  Configure the DbContext with .UseSqlServer().");
@@ -91,21 +92,24 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 var connectionString = dbContext.Database.GetDbConnection().ConnectionString;
 
+                var processorRegistry = serviceScope.ServiceProvider.GetRequiredService<IProcessorTypeRegistry<TContext>>();
+                
                 foreach (var syncEngineEntityType in _syncEngineEntityTypes)
                 {
-                    await dbContext.InitializeSyncEngine(syncEngineEntityType, SyncContext).ConfigureAwait(false);
+                    if (processorRegistry.HasBatchProcessor(syncEngineEntityType.ClrType, SyncContext))
+                        await dbContext.InitializeSyncEngine(syncEngineEntityType, SyncContext).ConfigureAwait(false);
                 }
 
                 serviceScope.Dispose();
 
                 _logger.LogInformation("Found {EntityTrackingCount} Entities with Sync Engine enabled for SyncContext: {SyncContext}", _syncEngineEntityTypes.Count, SyncContext);
 
-                var databaseChangeMonitor = _databaseChangeMonitorManager.GetChangeMonitor(databaseName, true);
+                var databaseChangeMonitor = _databaseChangeMonitorManager.GetChangeMonitor(databaseName, createIfNotExist: true);
 
                 var assemblyName = Assembly.GetEntryAssembly().GetName().Name.Split(".");
 
                 var applicationName = assemblyName.Skip(assemblyName.Length - 1).FirstOrDefault();
-
+                
                 foreach (var entityType in _syncEngineEntityTypes)
                 {
                     var changeRegistration = databaseChangeMonitor.RegisterForChanges(o =>

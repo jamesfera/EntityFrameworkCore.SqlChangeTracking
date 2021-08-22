@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.AsyncLinqExtensions;
 using EntityFrameworkCore.SqlChangeTracking.Models;
+using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +35,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
     public interface IProcessorTypeRegistry<TContext> where TContext : DbContext
     {
-        Type[] GetTypesForSyncContext(string syncContext);
+        Type[] GetProcessorTypesForSyncContext(string syncContext);
+        Type[] GetProcessorTypesForEntity(Type entityType, string syncContext);
+        bool HasBatchProcessor(Type entityType, string syncContext);
     }
 
     public class ProcessorTypeRegistry<TContext> : IProcessorTypeRegistry<TContext> where TContext : DbContext
@@ -46,12 +49,26 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             _registrations = registrations.Select(r => r.Registration).GroupBy(r => r.Key, r => r.Value).ToDictionary(g => g.Key, g => g.Distinct().ToArray());
         }
 
-        public Type[] GetTypesForSyncContext(string syncContext)
+        public Type[] GetProcessorTypesForEntity(Type entityType, string syncContext)
+        {
+            var entityTypesToMatch = entityType.GetAssignableTypesForEntity();
+
+            var entityProcessorTypes = GetProcessorTypesForSyncContext(syncContext).Where(p => entityTypesToMatch.Contains(p.GenericTypeArguments[0]) && p.GenericTypeArguments[1] == typeof(TContext)).ToArray();
+
+            return entityProcessorTypes;
+        }
+
+        public Type[] GetProcessorTypesForSyncContext(string syncContext)
         {
             if (!_registrations.TryGetValue(syncContext, out Type[] serviceTypes))
                 _registrations.Add(syncContext, serviceTypes = new Type[0]);
 
             return serviceTypes;
+        }
+
+        public bool HasBatchProcessor(Type entityType, string syncContext)
+        {
+            return GetProcessorTypesForEntity(entityType, syncContext).Any();
         }
     }
 
@@ -68,24 +85,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         public IEnumerable<IChangeSetBatchProcessor<TEntity, TContext>> GetBatchProcessors<TEntity>(string syncContext)
         {
-            var entityTypesToMatch = getAssignableTypesForEntity(typeof(TEntity));
-
-            var entityProcessorTypes = _processorTypeRegistry.GetTypesForSyncContext(syncContext).Where(p => entityTypesToMatch.Contains(p.GenericTypeArguments[0]) && p.GenericTypeArguments[1] == typeof(TContext));
+            var entityProcessorTypes = _processorTypeRegistry.GetProcessorTypesForEntity(typeof(TEntity), syncContext);
 
             var services = entityProcessorTypes.Select(t => (IChangeSetBatchProcessor<TEntity, TContext>)_serviceProvider.GetService(t)).ToArray();
 
             return services;
-        }
-
-        List<Type> getAssignableTypesForEntity(Type entityType)
-        {
-            var typeList = new List<Type>() { entityType };
-
-            var interfaces = entityType.GetInterfaces().Where(i => !i.IsGenericType && !i.IsGenericTypeDefinition);
-
-            typeList.AddRange(interfaces);
-
-            return typeList;
         }
     }
 

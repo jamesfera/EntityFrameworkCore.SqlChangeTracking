@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,6 +44,17 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
         public static Type[] GetChangeProcessorInterfaces<TContext>(this Type changeProcessorType) where TContext : DbContext
         {
             return changeProcessorType.GetInterfaces().Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == ProcessorInterfaceType).ToArray();
+        }
+
+        public static Type[] GetAssignableTypesForEntity(this Type entityType)
+        {
+            var typeList = new List<Type>() { entityType };
+
+            var interfaces = entityType.GetInterfaces().Where(i => !i.IsGenericType && !i.IsGenericTypeDefinition);
+
+            typeList.AddRange(interfaces);
+
+            return typeList.ToArray();
         }
     }
 }
