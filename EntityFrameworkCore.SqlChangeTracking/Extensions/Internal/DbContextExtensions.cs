@@ -16,6 +16,17 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
 {
     public static class DbContextExtensions
     {
+        public static Task ResetChangeTracking(this DbContext context, IEntityType entityType)
+        {
+            var tableName = entityType.GetFullTableName();
+
+            return context.Database.ExecuteSqlRawAsync(@$"ALTER TABLE {tableName}  
+                                                          DISABLE CHANGE_TRACKING  
+
+                                                          ALTER TABLE {tableName}  
+                                                          ENABLE CHANGE_TRACKING");
+        }
+
         public static async IAsyncEnumerable<IChangeTrackingEntry<T>> ToChangeSet<T>(this DbContext dbContext, string rawSql) where T : class, new()
         {
             var entityType = dbContext.Model.FindEntityType(typeof(T));

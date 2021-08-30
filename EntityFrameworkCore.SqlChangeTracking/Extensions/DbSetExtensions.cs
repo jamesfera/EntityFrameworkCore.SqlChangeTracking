@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using EntityFrameworkCore.SqlChangeTracking.Extensions.Internal;
 using EntityFrameworkCore.SqlChangeTracking.Models;
 using EntityFrameworkCore.SqlChangeTracking.Sql;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,15 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
         //        _contextCache.TryAdd(tableName, trackingContext);
         //    }
         //}
+
+        public static Task ResetChangeTracking<T>(this DbSet<T> dbSet) where T : class
+        {
+            var context = dbSet.GetService<ICurrentDbContext>().Context;
+
+            var entityType = context.Model.FindEntityType(typeof(T));
+
+            return context.ResetChangeTracking(entityType);
+        }
 
         public static IDisposable WithTrackingContext<T>(this DbSet<T> dbSet, string trackingContext) where T : class
         {

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -176,17 +175,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
         }
 
-        public Task ProcessChanges<TEntity>()
+        public Task ProcessChanges(string entityTypeName)
         {
-            return ProcessChanges(typeof(TEntity));
-        }
-
-        public Task ProcessChanges(Type clrEntityType)
-        {
-            var entityType = _syncEngineEntityTypes.FirstOrDefault(e => e.ClrType == clrEntityType);
-
-            if(entityType == null)
-                throw new InvalidOperationException($"No Entity Type found for ClrType: {clrEntityType.PrettyName()}");
+            var entityType = validateEntityName(entityTypeName);
 
             return ProcessChanges(entityType);
         }
@@ -239,10 +230,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         IEntityType validateEntityName(string entityName)
         {
-            var entityType = _syncEngineEntityTypes.FirstOrDefault(e => e.ClrType.Name.Equals(entityName));
+            var entityType = _syncEngineEntityTypes.FirstOrDefault(e => e.ClrType.Name.Equals(entityName, StringComparison.OrdinalIgnoreCase));
 
             if (entityType == null)
-                throw new InvalidOperationException($"Entity Type: {entityName} does not have sync engine enabled.");
+                throw new InvalidOperationException($"Entity Type: '{entityName}' does not have sync engine enabled.");
 
             validateEntityType(entityType);
 

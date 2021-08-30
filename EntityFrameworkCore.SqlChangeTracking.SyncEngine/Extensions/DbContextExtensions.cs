@@ -1,41 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.AsyncLinqExtensions;
-using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.Extensions.Internal;
 using EntityFrameworkCore.SqlChangeTracking.Models;
-using EntityFrameworkCore.SqlChangeTracking.Sql;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Models;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
 {
     internal static class InternalDbContextExtensions
     {
-        //public static async IAsyncEnumerable<IChangeTrackingEntry<T>> Next<T>(this DbContext db, IEntityType entityType, string syncContext) where T : class, new()
-        //{
-        //    var sql = SyncEngineSqlStatements.GetNextChangeSetExpression(entityType, syncContext);
-
-        //    return new AsyncEnumerableWrapper<T>(db.ToChangeSet<T>(sql), sql);
-        //}
-
-        //public static async IAsyncEnumerable<IChangeTrackingEntry<T>> All<T>(this DbContext db, IEntityType entityType, string syncContext) where T : class, new()
-        //{
-        //    var sql = SyncEngineSqlStatements.GetAllChangeSetsExpression(entityType, syncContext);
-
-        //    return new AsyncEnumerableWrapper<T>(db.ToChangeSet<T>(sql), sql);
-        //}
-
         public static async ValueTask<IChangeTrackingEntry<T>[]> NextHelper<T>(this DbContext db, IEntityType entityType, string syncContext) where T : class, new()
         {
             var lastChangedVersion = await db.GetLastChangeVersionAsync(entityType, syncContext);
@@ -48,24 +26,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
 
     public static class DbContextExtensions
     {
-        //public static IAsyncEnumerable<IChangeTrackingEntry<T>> Next<T>(this IChangesQueryContext<T> context, string syncContext = "Default") where T : class, new()
-        //{
-        //    var dbContext = context.DbSet.GetService<ICurrentDbContext>().Context;
-
-        //    var entityType = dbContext.Model.FindEntityType(typeof(T));
-
-        //    return dbContext.Next<T>(entityType, syncContext);
-        //}
-
-        //public static IAsyncEnumerable<IChangeTrackingEntry<T>> All<T>(this IChangesQueryContext<T> context, string syncContext = "Default") where T : class, new()
-        //{
-        //    var dbContext = context.DbSet.GetService<ICurrentDbContext>().Context;
-
-        //    var entityType = dbContext.Model.FindEntityType(typeof(T));
-
-        //    return dbContext.All<T>(entityType, syncContext);
-        //}
-
         public static ValueTask<long?> GetLastChangeVersionAsync<T>(this DbContext db, string syncContext)
         {
             var entityType = db.Model.FindEntityType(typeof(T));
@@ -84,35 +44,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
 
             return nextVal;
         }
-
-        //public static ValueTask<long?> GetLastChangeVersionAsync<T>(this DbContext db, string syncContext)
-        //{
-        //    var entityType = db.Model.FindEntityType(typeof(T));
-
-        //    return db.GetLastChangeVersionAsync(entityType, syncContext);
-        //}
-
-        //public static async ValueTask<long?> GetNextVersionAsync<T>(this DbContext dbContext, string syncContext) where T : class
-        //{
-        //    var entityType = dbContext.Model.FindEntityType(typeof(T));
-
-        //    var lastChangeVersion = SyncEngineSqlStatements.GetLastChangeVersionExpression(entityType, syncContext);
-
-        //    var sql = ChangeTableSqlStatements.GetNextChangeVersionExpression(entityType, lastChangeVersion);
-
-        //    return (await dbContext.SqlQueryAsync(() => new { NextVersion = 0L }, sql)).FirstOrDefault()?.NextVersion;
-        //}
-
-        //public static long? GetNextVersion<T>(this DbContext dbContext, string syncContext) where T : class
-        //{
-        //    var entityType = dbContext.Model.FindEntityType(typeof(T));
-
-        //    var lastChangeVersion = SyncEngineSqlStatements.GetLastChangeVersionExpression(entityType, syncContext);
-
-        //    var sql = ChangeTableSqlStatements.GetNextChangeVersionExpression(entityType, lastChangeVersion);
-
-        //    return dbContext.SqlQuery(() => new { NextVersion = 0L }, sql).FirstOrDefault()?.NextVersion;
-        //}
 
         public static ValueTask SetLastChangedVersionAsync(this DbContext db, IEntityType entityType, string syncContext, long version)
         {

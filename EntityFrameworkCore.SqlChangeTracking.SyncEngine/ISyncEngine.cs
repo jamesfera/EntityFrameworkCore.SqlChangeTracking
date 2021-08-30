@@ -15,10 +15,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         public IReadOnlyList<IEntityType> SyncEntityTypes { get; }
 
         Task ProcessAllChanges();
-        Task ProcessChanges(IEntityType entityType);
 
-        Task ProcessChanges<TEntity>();
-        Task ProcessChanges(Type clrEntityType);
+        Task ProcessChanges(IEntityType entityType);
+        Task ProcessChanges(string entityTypeName);
 
         Task SetChangeVersion(string entityName, long changeVersion);
         Task SetChangeVersion(IEntityType entityType, long changeVersion);

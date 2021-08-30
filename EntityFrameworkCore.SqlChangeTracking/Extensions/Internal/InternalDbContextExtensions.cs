@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Models;
 using EntityFrameworkCore.SqlChangeTracking.Sql;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
             return new AsyncEnumerableWrapper<T>(context.ToChangeSet<T>(sql), sql);
         }
 
-        internal static void Validate(IEntityType entityType)
+        static void Validate(IEntityType entityType)
         {
             var changeTrackingEnabled = entityType.IsSqlChangeTrackingEnabled();
 
