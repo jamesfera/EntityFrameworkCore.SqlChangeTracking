@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Sql;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
@@ -19,6 +15,23 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
 
         //    return sql;
         //}
+
+        static int BatchSize = 200;
+
+        public static string GetNextBatchExpression(IEntityType entityType, object? previousPageToken)
+        {
+            var prefix = "E";
+
+            var columnNames = ChangeTableSqlStatements.GetEntityColumnNames(entityType, prefix, prefix);
+
+            var primaryKeyColumns = entityType.GetPrimaryKeyString(prefix);
+
+            previousPageToken ??= 0;
+
+            var sql = $"SELECT TOP {BatchSize} {columnNames} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} ORDER BY {primaryKeyColumns}";
+
+            return sql;
+        }
 
         public static string GetNextChangeSetExpression(IEntityType entityType, long? lastChangedVersion)
         {

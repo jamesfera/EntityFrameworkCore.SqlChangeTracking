@@ -34,7 +34,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
         {
             var fullTableName = entityType.GetFullTableName();
 
-            var columnNames = GetColumnNamesString(entityType, EntityTablePrefix, ChangeTablePrefix);
+            var entityColumnNames = GetEntityColumnNames(entityType, ChangeTablePrefix, EntityTablePrefix);
+
+            var columnNames = entityColumnNames.Append(", ").Append(ChangeTrackingColumnNames);
 
             var onExpression = GetJoinConditionExpression(entityType, EntityTablePrefix, ChangeTablePrefix);
 
@@ -58,12 +60,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
             return sql;
         }
 
-        public static string GetColumnNamesString(IEntityType entityType, string entityTablePrefix, string changeTablePrefix)
+        public static StringBuilder GetEntityColumnNames(IEntityType entityType, string pkPrefix, string columnPrefix)
         {
             StringBuilder sb = new StringBuilder();
 
             //primary key columns
-            sb.Append(string.Join(",", entityType.GetPrimaryKeyColumnNames(changeTablePrefix)));
+            sb.Append(string.Join(",", entityType.GetPrimaryKeyColumnNames(pkPrefix)));
 
             var baseType = entityType.BaseType;
 
@@ -76,13 +78,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
                 foreach (var baseColumn in baseColumns)
                 {
                     sb.Append(",");
-                    sb.Append($"(SELECT {basePrefix}.{baseColumn} FROM {baseType.GetTableName()} AS {basePrefix} WHERE {GetJoinConditionExpression(baseType, basePrefix, entityTablePrefix)}) AS {baseColumn}");
+                    sb.Append($"(SELECT {basePrefix}.{baseColumn} FROM {baseType.GetTableName()} AS {basePrefix} WHERE {GetJoinConditionExpression(baseType, basePrefix, columnPrefix)}) AS {baseColumn}");
                 }
 
                 baseType = baseType.BaseType;
             }
 
-            var entityColumns = entityType.GetDeclaredColumnNames(true).Select(c => $"{entityTablePrefix}.{c}");
+            var entityColumns = entityType.GetDeclaredColumnNames(true).Select(c => $"{columnPrefix}.{c}");
 
             if (entityColumns.Any())
             {
@@ -90,13 +92,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
                 sb.Append(string.Join(",", entityColumns));
             }
 
-            sb.Append(",");
-
-            //change table columns
-            sb.Append("SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext");
-
-            return sb.ToString();
+            return sb;
         }
+
+        static readonly StringBuilder ChangeTrackingColumnNames = new StringBuilder("SYS_CHANGE_VERSION as ChangeVersion, SYS_CHANGE_CREATION_VERSION as CreationVersion, SYS_CHANGE_OPERATION as ChangeOperation, SYS_CHANGE_CONTEXT as ChangeContext");
 
         public static string GetJoinConditionExpression(IEntityType entityType, params string[] prefixes)
         {

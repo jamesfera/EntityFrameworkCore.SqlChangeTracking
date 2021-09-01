@@ -163,9 +163,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             if (!_started)
                 throw new InvalidOperationException("Sync Engine has not started.");
 
+            validateEntityType(entityType);
+
             try
             {
                 _logger.LogDebug("Processing changes for Entity: {EntityType}", entityType.ClrType);
+
                 await _changeSetProcessor.ProcessChanges(entityType, SyncContext).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -180,6 +183,30 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             var entityType = validateEntityName(entityTypeName);
 
             return ProcessChanges(entityType);
+        }
+
+        public async Task ProcessDataSet(IEntityType entityType)
+        {
+            validateEntityType(entityType);
+
+            try
+            {
+                _logger.LogDebug("Processing entire data set for Entity: {EntityType}", entityType.ClrType);
+               
+                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing data set for Table: {TableName} for SyncContext: {SyncContext}", entityType.GetFullTableName(), SyncContext);
+                throw;
+            }
+        }
+
+        public Task ProcessDataSet(string entityTypeName)
+        {
+            var entityType = validateEntityName(entityTypeName);
+
+            return ProcessDataSet(entityType);
         }
 
         public async Task MarkEntityAsSynced(IEntityType entityType)

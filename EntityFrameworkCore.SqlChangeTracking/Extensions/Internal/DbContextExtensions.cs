@@ -27,27 +27,27 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
                                                           ENABLE CHANGE_TRACKING");
         }
 
-        public static async IAsyncEnumerable<IChangeTrackingEntry<T>> ToChangeSet<T>(this DbContext dbContext, string rawSql) where T : class, new()
+        public static async IAsyncEnumerable<IChangeTrackingEntry<T>> ToChangeSet<T>(this DbContext dbContext, string rawSql, bool hasChangeTrackingInfo = true) where T : class, new()
         {
             var entityType = dbContext.Model.FindEntityType(typeof(T));
 
             var reader = (await dbContext.Database.ExecuteSqlQueryAsync(rawSql).ConfigureAwait(false)).DbDataReader;
 
             while (await reader.ReadAsync().ConfigureAwait(false))
-                yield return mapToChangeTrackingEntry<T>(reader, entityType);
+                yield return mapToChangeTrackingEntry<T>(reader, entityType, hasChangeTrackingInfo);
         }
 
         static Func<object, object> DefaultValueConverter = o => o == DBNull.Value ? null : o;
 
-        static IChangeTrackingEntry<T> mapToChangeTrackingEntry<T>(DbDataReader reader, IEntityType entityType) where T : class, new()
+        static IChangeTrackingEntry<T> mapToChangeTrackingEntry<T>(DbDataReader reader, IEntityType entityType, bool hasChangeTrackingInfo) where T : class, new()
         {
-            var byteArray = reader[nameof(ChangeTrackingEntry<T>.ChangeContext)] as byte[];
+            var byteArray = hasChangeTrackingInfo ? reader[nameof(ChangeTrackingEntry<T>.ChangeContext)] as byte[] : null;
 
-            var changeContext = byteArray == null ? null : Encoding.UTF8.GetString(byteArray);
-            var changeVersion = reader[nameof(ChangeTrackingEntry<T>.ChangeVersion)] as long?;
-            var creationVersion = reader[nameof(ChangeTrackingEntry<T>.CreationVersion)] as long?;
+            var changeContext = hasChangeTrackingInfo ? byteArray == null ? null : Encoding.UTF8.GetString(byteArray) : null;
+            var changeVersion = hasChangeTrackingInfo ? reader[nameof(ChangeTrackingEntry<T>.ChangeVersion)] as long? : null;
+            var creationVersion = hasChangeTrackingInfo ? reader[nameof(ChangeTrackingEntry<T>.CreationVersion)] as long? : null;
 
-            var operation = reader[nameof(ChangeTrackingEntry<T>.ChangeOperation)] as string;
+            var operation = hasChangeTrackingInfo ? reader[nameof(ChangeTrackingEntry<T>.ChangeOperation)] as string : null;
 
             ChangeOperation changeOperation = operation switch
                 {

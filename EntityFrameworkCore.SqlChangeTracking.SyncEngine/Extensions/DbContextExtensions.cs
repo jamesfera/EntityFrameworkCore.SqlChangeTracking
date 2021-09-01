@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.AsyncLinqExtensions;
 using EntityFrameworkCore.SqlChangeTracking.Extensions.Internal;
@@ -14,13 +17,37 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
 {
     internal static class InternalDbContextExtensions
     {
-        public static async ValueTask<IChangeTrackingEntry<T>[]> NextHelper<T>(this DbContext db, IEntityType entityType, string syncContext) where T : class, new()
+        public static async ValueTask<IChangeTrackingEntry<T>[]> NextHelper<T>(this DbContext db, string syncContext) where T : class, new()
         {
+            var entityType = db.Model.FindEntityType(typeof(T));
+
             var lastChangedVersion = await db.GetLastChangeVersionAsync(entityType, syncContext);
 
             var sql = SyncEngineSqlStatements.GetNextChangeSetExpression(entityType, lastChangedVersion);
 
             return await db.ToChangeSet<T>(sql).ToArrayAsync();
+        }
+
+        public static async ValueTask<(IChangeTrackingEntry<T>[] Entries, object? PageToken)> NextDataSetHelper<T>(this DbContext db, object? previousPageToken) where T : class, new()
+        {
+            var entityType = db.Model.FindEntityType(typeof(T));
+
+            var sql = SyncEngineSqlStatements.GetNextBatchExpression(entityType, previousPageToken);
+
+            var results = await db.ToChangeSet<T>(sql, false).ToArrayAsync();
+
+            if (results.Any())
+            {
+                var param = Expression.Parameter(typeof(IChangeTrackingEntry<T>), "p");
+
+                var exp = Expression.Lambda<Func<IChangeTrackingEntry<T>, long>>(Expression.Convert(Expression.Property(Expression.Property(param, "Entry"), "Id"), typeof(long)), param).Compile();
+
+                var max = results.Max(exp);
+
+                return (results, max);
+            }
+
+            return (results, null);
         }
     }
 

@@ -19,6 +19,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         Task ProcessChanges(IEntityType entityType);
         Task ProcessChanges(string entityTypeName);
 
+        Task ProcessDataSet(IEntityType entityType);
+        Task ProcessDataSet(string entityTypeName);
+
         Task SetChangeVersion(string entityName, long changeVersion);
         Task SetChangeVersion(IEntityType entityType, long changeVersion);
 

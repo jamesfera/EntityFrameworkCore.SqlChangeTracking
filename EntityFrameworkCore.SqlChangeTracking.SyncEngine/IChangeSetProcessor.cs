@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Diagnostics;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Logging;
@@ -12,15 +10,34 @@ using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileSystemGlobbing.Internal.PathSegments;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 {
+    
+
+    public delegate ValueTask<IChangeTrackingEntry<TEntity>[]> GetNextBatchDelegate<TEntity>(DbContext dbContext, string syncContext);
+    
+    public class DataSetState<TEntity> where TEntity : class, new()
+    {
+        object _previousPageToken = null;
+
+        public async ValueTask<IChangeTrackingEntry<TEntity>[]> T1(DbContext dbContext, string syncContext)
+        {
+            var result = await dbContext.NextDataSetHelper<TEntity>(_previousPageToken);
+
+            _previousPageToken = result.PageToken;
+            return result.Entries;
+        }
+
+        public ValueTask<IChangeTrackingEntry<TEntity>[]> T2(DbContext dbContext, string syncContext) => dbContext.NextHelper<TEntity>(syncContext);
+    }
+
     public interface IChangeSetProcessor<TContext> where TContext : DbContext
     {
         Task ProcessChanges(IEntityType entityType, string syncContext);
+        Task ProcessEntireDataSet(IEntityType entityType, string syncContext);
     }
 
     public class ChangeSetProcessor<TContext> : IChangeSetProcessor<TContext> where TContext : DbContext
@@ -34,16 +51,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             _logger = logger ?? NullLogger<ChangeSetProcessor<TContext>>.Instance;
         }
 
-        public async Task ProcessChanges(IEntityType entityType, string syncContext)
+        public Task ProcessChanges(IEntityType entityType, string syncContext) => ProcessInternal(entityType, syncContext, getNextChangeSetFunc(entityType), ChangeBatchType.Changes);
+
+        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType), ChangeBatchType.DataSet);
+
+        async Task ProcessInternal(IEntityType entityType, string syncContext, Delegate getNextBatchDelegate, ChangeBatchType changeBatchType)
         {
-            ValueTask BatchCompleteFunc(IChangeSetProcessorContext<TContext> context, IChangeTrackingEntry[] changeSet)
-            {
-                if (context.RecordCurrentVersion) return context.DbContext.SetLastChangedVersionAsync(entityType, syncContext, changeSet.Max(e => e.ChangeVersion ?? 0));
-
-                return new ValueTask();
-            }
-
-            var method = GetType().GetMethod(nameof(processBatch), BindingFlags.NonPublic | BindingFlags.Instance).MakeGenericMethod(entityType.ClrType);
+            var processBatchMethod = GetType().GetMethod(nameof(processBatch), BindingFlags.NonPublic | BindingFlags.Instance).MakeGenericMethod(entityType.ClrType);
 
             IChangeTrackingEntry[] currentBatch;
 
@@ -71,19 +85,28 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 //await using var t = transaction;
 
-                var changesFunc = getNextChangeSetFunc(entityType);
-
-                currentBatch = await (ValueTask<IChangeTrackingEntry[]>) method.Invoke(this, new[] {syncContext as object, changesFunc, dbContext, changeSetBatchProcessorFactory, processorContext});
-
+                currentBatch = await (ValueTask<IChangeTrackingEntry[]>)processBatchMethod.Invoke(this, new[] { syncContext as object, getNextBatchDelegate, dbContext, changeSetBatchProcessorFactory, processorContext, changeBatchType });
+                
                 if (processorContext.RecordCurrentVersion && currentBatch.Any())
-                    await dbContext.SetLastChangedVersionAsync(entityType, syncContext, currentBatch.Max(e => e.ChangeVersion ?? 0));
+                {
+                    var maxChangeVersion = currentBatch.Max(e => e.ChangeVersion ?? 0);
+
+                    if(maxChangeVersion > 0)
+                        await dbContext.SetLastChangedVersionAsync(entityType, syncContext, maxChangeVersion);
+                }
 
                 //await t?.CommitAsync();
 
             } while (currentBatch?.Any() ?? false);
         }
 
-        async ValueTask<IChangeTrackingEntry[]> processBatch<TEntity>(string syncContext, Func<TContext, string, ValueTask<IChangeTrackingEntry<TEntity>[]>> getBatchFunc, TContext dbContext, IChangeSetBatchProcessorFactory<TContext> changeSetBatchProcessorFactory, ChangeSetProcessorContext<TContext> processorContext)
+        async ValueTask<IChangeTrackingEntry[]> processBatch<TEntity>(
+            string syncContext,
+            GetNextBatchDelegate<TEntity> getBatchFunc,
+            TContext dbContext, 
+            IChangeSetBatchProcessorFactory<TContext> changeSetBatchProcessorFactory, 
+            ChangeSetProcessorContext<TContext> processorContext,
+            ChangeBatchType changeBatchType)
         {
             var processors = changeSetBatchProcessorFactory.GetBatchProcessors<TEntity>(syncContext).ToArray();
 
@@ -132,7 +155,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                 {
                     _logger.LogDebug("Processing {ChangeEntryCount} change(s) with Change Set Processor: {ChangeSetProcessorName}", batch.Length, changeSetProcessor.GetType().PrettyName());
 
-                    await changeSetProcessor.ProcessBatch(batch, processorContext);
+                    await changeSetProcessor.ProcessBatch(new ChangeBatch<TEntity>(batch, changeBatchType), processorContext);
 
                     _logger.LogDebug("{ChangeEntryCount} change(s) successfully processed with Change Set Processor: {ChangeSetProcessorName}", batch.Length, changeSetProcessor.GetType().PrettyName());
                 }
@@ -154,37 +177,26 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             return batch;
         }
 
-        Delegate getNextChangeSetFunc(IEntityType entityType)
+        Delegate getEntireDataSetFunc(IEntityType entityType)
         {
-            var getChangesMethodInfo = typeof(InternalDbContextExtensions).GetMethod(nameof(InternalDbContextExtensions
-                    .NextHelper), BindingFlags.Public | BindingFlags.Static).MakeGenericMethod(entityType.ClrType);
-            
-            var dbContextParameter = Expression.Parameter(typeof(TContext), "dbContext");
+            var stateType = typeof(DataSetState<>).MakeGenericType(entityType.ClrType);
 
-            var syncContextParameter = Expression.Parameter(typeof(string), "syncContext");// Expression.Constant(syncContext);
+            var state = Activator.CreateInstance(stateType);
 
-            var getChangesCallExpression = Expression.Call(getChangesMethodInfo, dbContextParameter, Expression.Constant(entityType), syncContextParameter);
+            var dtc = typeof(GetNextBatchDelegate<>).MakeGenericType(entityType.ClrType);
 
-            var lambda = Expression.Lambda(getChangesCallExpression, dbContextParameter, syncContextParameter);
-
-            return lambda.Compile();
+            return Delegate.CreateDelegate(dtc, state, stateType.GetMethod(nameof(DataSetState<object>.T1)));
         }
 
-        //Delegate getBatchCompleteFunc(IEntityType entityType, string syncContext)
-        //{
-        //    //if (processorContext.RecordCurrentVersion)
-        //        //                await dbContext.SetLastChangedVersionFor(entityType, changeSet.Max(r => r.ChangeVersion ?? 0), syncContext);
+        Delegate getNextChangeSetFunc(IEntityType entityType)
+        {
+            var stateType = typeof(DataSetState<>).MakeGenericType(entityType.ClrType);
 
-        //        var processorContextParameter = Expression.Parameter(typeof(ChangeSetProcessorContext<TContext>), "processorContext");
+            var state = Activator.CreateInstance(stateType);
 
-        //    var entityTypeParameter = Expression.Constant(entityType);
-        //    var syncContextParameter = Expression.Constant(syncContext);
+            var dtc = typeof(GetNextBatchDelegate<>).MakeGenericType(entityType.ClrType);
 
-        //    var getChangesCallExpression = Expression.Call(getChangesMethodInfo, dbContextParameterExpression, entityTypeParameter, syncContextParameter);
-
-        //    var lambda = Expression.Lambda(getChangesCallExpression, processorContextParameter);
-
-        //    return lambda.Compile();
-        //}
+            return Delegate.CreateDelegate(dtc, state, stateType.GetMethod(nameof(DataSetState<object>.T2)));
+        }
     }
 }
