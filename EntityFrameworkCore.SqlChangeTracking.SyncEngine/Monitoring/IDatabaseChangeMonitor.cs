@@ -108,7 +108,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
         ConcurrentDictionary<string, Task<SqlDependencyEx>> _sqlDependencies = new ConcurrentDictionary<string, Task<SqlDependencyEx>>();
         ConcurrentDictionary<string, ImmutableList<ChangeRegistration>> _registeredChangeActions = new ConcurrentDictionary<string, ImmutableList<ChangeRegistration>>();
 
-        bool _paused = true;
+        bool _paused = false;
 
         protected internal DatabaseChangeMonitor(string databaseName, ILoggerFactory loggerFactory = null)
         {
@@ -217,7 +217,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
             {
                 tableName = $"{sqlEx.SchemaName}.{sqlEx.TableName}";
 
-                if (!_paused)
+                if (_paused)
                 {
                     _logger.LogDebug("Database Change Monitor paused.  Skipping change notification for table: {TableName}", tableName);
                     return;
