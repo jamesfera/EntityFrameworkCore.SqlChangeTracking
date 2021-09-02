@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Logging;
 using EntityFrameworkCore.SqlChangeTracking.Models;
@@ -36,8 +37,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
     public interface IChangeSetProcessor<TContext> where TContext : DbContext
     {
-        Task ProcessChanges(IEntityType entityType, string syncContext);
-        Task ProcessEntireDataSet(IEntityType entityType, string syncContext);
+        Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken);
+        Task ProcessEntireDataSet(IEntityType entityType, string syncContext, CancellationToken cancellationToken);
     }
 
     public class ChangeSetProcessor<TContext> : IChangeSetProcessor<TContext> where TContext : DbContext
@@ -51,11 +52,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             _logger = logger ?? NullLogger<ChangeSetProcessor<TContext>>.Instance;
         }
 
-        public Task ProcessChanges(IEntityType entityType, string syncContext) => ProcessInternal(entityType, syncContext, getNextChangeSetFunc(entityType), ChangeBatchType.Changes);
+        public Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getNextChangeSetFunc(entityType), ChangeBatchType.Changes, cancellationToken);
 
-        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType), ChangeBatchType.DataSet);
+        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType), ChangeBatchType.DataSet, cancellationToken);
 
-        async Task ProcessInternal(IEntityType entityType, string syncContext, Delegate getNextBatchDelegate, ChangeBatchType changeBatchType)
+        async Task ProcessInternal(IEntityType entityType, string syncContext, Delegate getNextBatchDelegate, ChangeBatchType changeBatchType, CancellationToken cancellationToken)
         {
             var processBatchMethod = GetType().GetMethod(nameof(processBatch), BindingFlags.NonPublic | BindingFlags.Instance).MakeGenericMethod(entityType.ClrType);
 
@@ -85,19 +86,19 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 //await using var t = transaction;
 
-                currentBatch = await (ValueTask<IChangeTrackingEntry[]>)processBatchMethod.Invoke(this, new[] { syncContext as object, getNextBatchDelegate, dbContext, changeSetBatchProcessorFactory, processorContext, changeBatchType });
-                
+                currentBatch = await (ValueTask<IChangeTrackingEntry[]>) processBatchMethod.Invoke(this, new[] {syncContext as object, getNextBatchDelegate, dbContext, changeSetBatchProcessorFactory, processorContext, changeBatchType, cancellationToken});
+
                 if (processorContext.RecordCurrentVersion && currentBatch.Any())
                 {
                     var maxChangeVersion = currentBatch.Max(e => e.ChangeVersion ?? 0);
 
-                    if(maxChangeVersion > 0)
+                    if (maxChangeVersion > 0)
                         await dbContext.SetLastChangedVersionAsync(entityType, syncContext, maxChangeVersion);
                 }
 
                 //await t?.CommitAsync();
 
-            } while (currentBatch?.Any() ?? false);
+            } while (!cancellationToken.IsCancellationRequested && (currentBatch?.Any() ?? false));
         }
 
         async ValueTask<IChangeTrackingEntry[]> processBatch<TEntity>(
@@ -106,7 +107,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             TContext dbContext, 
             IChangeSetBatchProcessorFactory<TContext> changeSetBatchProcessorFactory, 
             ChangeSetProcessorContext<TContext> processorContext,
-            ChangeBatchType changeBatchType)
+            ChangeBatchType changeBatchType,
+            CancellationToken cancellationToken
+            )
         {
             var processors = changeSetBatchProcessorFactory.GetBatchProcessors<TEntity>(syncContext).ToArray();
 
@@ -155,7 +158,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                 {
                     _logger.LogDebug("Processing {ChangeEntryCount} change(s) with Change Set Processor: {ChangeSetProcessorName}", batch.Length, changeSetProcessor.GetType().PrettyName());
 
-                    await changeSetProcessor.ProcessBatch(new ChangeBatch<TEntity>(batch, changeBatchType), processorContext);
+                    await changeSetProcessor.ProcessBatch(new ChangeBatch<TEntity>(batch, changeBatchType), processorContext, cancellationToken);
 
                     _logger.LogDebug("{ChangeEntryCount} change(s) successfully processed with Change Set Processor: {ChangeSetProcessorName}", batch.Length, changeSetProcessor.GetType().PrettyName());
                 }

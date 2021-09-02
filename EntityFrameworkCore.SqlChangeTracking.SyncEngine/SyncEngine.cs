@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -57,7 +58,6 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                 using var serviceScope = _serviceScopeFactory.CreateScope();
 
                 var dbContext = serviceScope.ServiceProvider.GetRequiredService<TContext>();
-
 
                 if (!dbContext.Database.IsSqlServer())
                 {
@@ -121,7 +121,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                             {
                                 _logger.LogDebug("Received Change notification for Table: {TableName} in Database: {DatabaseName}", n.Table, n.Database);
 
-                                return ProcessChanges(entityType);
+                                return Task.WhenAll( ProcessChanges(entityType), ProcessChanges(entityType));
                             };
 
                             o.OnChangeMonitorTerminated = (monitor, table, application, ex) =>
@@ -151,6 +151,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
         }
 
+        ConcurrentDictionary<string, SemaphoreSlim> _entityChangeProcessingSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
+
         public async Task ProcessAllChanges()
         {
             var processChangesTasks = _syncEngineEntityTypes.Select(ProcessChanges).ToArray();
@@ -165,16 +167,24 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
             validateEntityType(entityType);
 
+            var semaphore = _entityChangeProcessingSemaphores.GetOrAdd(entityType.Name, new SemaphoreSlim(1));
+
             try
             {
+                await semaphore.WaitAsync();
+
                 _logger.LogDebug("Processing changes for Entity: {EntityType}", entityType.ClrType);
 
-                await _changeSetProcessor.ProcessChanges(entityType, SyncContext).ConfigureAwait(false);
+                await _changeSetProcessor.ProcessChanges(entityType, SyncContext, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing Changes for Table: {TableName} for SyncContext: {SyncContext}", entityType.GetFullTableName(), SyncContext);
                 throw;
+            }
+            finally
+            {
+                semaphore.Release();
             }
         }
 
@@ -185,20 +195,31 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             return ProcessChanges(entityType);
         }
 
+        ConcurrentDictionary<string, bool> _entityDataSetProcessingMonitors = new ConcurrentDictionary<string, bool>();
+
         public async Task ProcessDataSet(IEntityType entityType)
         {
             validateEntityType(entityType);
 
+            if(!_entityDataSetProcessingMonitors.TryAdd(entityType.Name, true))
+                return;
+
             try
             {
-                _logger.LogDebug("Processing entire data set for Entity: {EntityType}", entityType.ClrType);
+                _logger.LogInformation("Processing entire data set for Entity: {EntityType}", entityType.ClrType);
                
-                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext).ConfigureAwait(false);
+                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, CancellationToken.None).ConfigureAwait(false);
+
+                _logger.LogInformation("Completed processing entire data set for Entity: {EntityType}", entityType.ClrType);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing data set for Table: {TableName} for SyncContext: {SyncContext}", entityType.GetFullTableName(), SyncContext);
                 throw;
+            }
+            finally
+            {
+                _entityDataSetProcessingMonitors.Remove(entityType.Name, out bool v);
             }
         }
 
