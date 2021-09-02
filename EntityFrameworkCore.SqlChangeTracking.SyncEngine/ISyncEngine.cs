@@ -14,13 +14,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         public IReadOnlyList<IEntityType> SyncEntityTypes { get; }
 
-        Task ProcessAllChanges();
+        Task ProcessAllChanges(CancellationToken cancellationToken);
 
-        Task ProcessChanges(IEntityType entityType);
-        Task ProcessChanges(string entityTypeName);
+        Task ProcessChanges(IEntityType entityType, CancellationToken cancellationToken);
+        Task ProcessChanges(string entityTypeName, CancellationToken cancellationToken);
 
-        Task ProcessDataSet(IEntityType entityType);
-        Task ProcessDataSet(string entityTypeName);
+        Task ProcessDataSet(IEntityType entityType, CancellationToken cancellationToken);
+        Task ProcessDataSet(string entityTypeName, CancellationToken cancellationToken);
 
         Task SetChangeVersion(string entityName, long changeVersion);
         Task SetChangeVersion(IEntityType entityType, long changeVersion);

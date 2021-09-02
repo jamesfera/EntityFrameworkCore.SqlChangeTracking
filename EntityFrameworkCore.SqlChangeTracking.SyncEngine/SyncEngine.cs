@@ -121,7 +121,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                             {
                                 _logger.LogDebug("Received Change notification for Table: {TableName} in Database: {DatabaseName}", n.Table, n.Database);
 
-                                return Task.WhenAll( ProcessChanges(entityType), ProcessChanges(entityType));
+                                return ProcessChanges(entityType, CancellationToken.None);
                             };
 
                             o.OnChangeMonitorTerminated = (monitor, table, application, ex) =>
@@ -153,14 +153,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         ConcurrentDictionary<string, SemaphoreSlim> _entityChangeProcessingSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
 
-        public async Task ProcessAllChanges()
+        public async Task ProcessAllChanges(CancellationToken cancellationToken)
         {
-            var processChangesTasks = _syncEngineEntityTypes.Select(ProcessChanges).ToArray();
+            var processChangesTasks = _syncEngineEntityTypes.Select(e => ProcessChanges(e, cancellationToken)).ToArray();
 
             await Task.WhenAll(processChangesTasks).ConfigureAwait(false);
         }
 
-        public async Task ProcessChanges(IEntityType entityType)
+        public async Task ProcessChanges(IEntityType entityType, CancellationToken cancellationToken)
         {
             if (!_started)
                 throw new InvalidOperationException("Sync Engine has not started.");
@@ -175,7 +175,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 _logger.LogDebug("Processing changes for Entity: {EntityType}", entityType.ClrType);
 
-                await _changeSetProcessor.ProcessChanges(entityType, SyncContext, CancellationToken.None).ConfigureAwait(false);
+                await _changeSetProcessor.ProcessChanges(entityType, SyncContext, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -188,16 +188,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
         }
 
-        public Task ProcessChanges(string entityTypeName)
+        public Task ProcessChanges(string entityTypeName, CancellationToken cancellationToken)
         {
             var entityType = validateEntityName(entityTypeName);
 
-            return ProcessChanges(entityType);
+            return ProcessChanges(entityType, cancellationToken);
         }
 
         ConcurrentDictionary<string, bool> _entityDataSetProcessingMonitors = new ConcurrentDictionary<string, bool>();
 
-        public async Task ProcessDataSet(IEntityType entityType)
+        public async Task ProcessDataSet(IEntityType entityType, CancellationToken cancellationToken)
         {
             validateEntityType(entityType);
 
@@ -208,7 +208,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             {
                 _logger.LogInformation("Processing entire data set for Entity: {EntityType}", entityType.ClrType);
                
-                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, CancellationToken.None).ConfigureAwait(false);
+                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, cancellationToken).ConfigureAwait(false);
 
                 _logger.LogInformation("Completed processing entire data set for Entity: {EntityType}", entityType.ClrType);
             }
@@ -223,11 +223,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
         }
 
-        public Task ProcessDataSet(string entityTypeName)
+        public Task ProcessDataSet(string entityTypeName, CancellationToken cancellationToken)
         {
             var entityType = validateEntityName(entityTypeName);
 
-            return ProcessDataSet(entityType);
+            return ProcessDataSet(entityType, cancellationToken);
         }
 
         public async Task MarkEntityAsSynced(IEntityType entityType)
