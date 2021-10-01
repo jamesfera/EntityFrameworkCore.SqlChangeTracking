@@ -40,5 +40,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         {
             return entityType.GetAnnotations().Where(a => a.Name.StartsWith("SyncEngineContext_")).Select(a => a.Value.ToString()).ToArray();
         }
+
+        public static string[] GetSyncContexts(this IMutableEntityType entityType)
+        {
+            return entityType.GetAnnotations().Where(a => a.Name.StartsWith("SyncEngineContext_")).Select(a => a.Value.ToString()).ToArray();
+        }
     }
 }
