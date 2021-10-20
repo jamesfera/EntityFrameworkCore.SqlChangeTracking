@@ -65,7 +65,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
             StringBuilder sb = new StringBuilder();
 
             //primary key columns
-            sb.Append(string.Join(",", entityType.GetPrimaryKeyColumnNames(pkPrefix)));
+            sb.Append(string.Join(",", entityType.GetPrimaryKeyColumnNames().Select(p => $"{pkPrefix}.[{p}]")));
 
             var baseType = entityType.BaseType;
 
@@ -78,13 +78,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
                 foreach (var baseColumn in baseColumns)
                 {
                     sb.Append(",");
-                    sb.Append($"(SELECT {basePrefix}.{baseColumn} FROM {baseType.GetTableName()} AS {basePrefix} WHERE {GetJoinConditionExpression(baseType, basePrefix, columnPrefix)}) AS {baseColumn}");
+                    sb.Append($"(SELECT {basePrefix}.[{baseColumn}] FROM [{baseType.GetTableName()}] AS {basePrefix} WHERE {GetJoinConditionExpression(baseType, basePrefix, columnPrefix)}) AS {baseColumn}");
                 }
 
                 baseType = baseType.BaseType;
             }
 
-            var entityColumns = entityType.GetDeclaredColumnNames(true).Select(c => $"{columnPrefix}.{c}");
+            var entityColumns = entityType.GetDeclaredColumnNames(true).Select(c => $"{columnPrefix}.[{c}]");
 
             if (entityColumns.Any())
             {
@@ -99,7 +99,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
 
         public static string GetJoinConditionExpression(IEntityType entityType, params string[] prefixes)
         {
-            return string.Join(" AND ", entityType.GetPrimaryKeyColumnNames().Select(name => string.Join(" = ", prefixes.Select(p => $"{p}.{name}"))));
+            return string.Join(" AND ", entityType.GetPrimaryKeyColumnNames().Select(name => string.Join(" = ", prefixes.Select(p => $"{p}.[{name}]"))));
         }
     }
 }
