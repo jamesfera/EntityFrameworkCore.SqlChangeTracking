@@ -26,7 +26,9 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
         public static string[] GetColumnNames(this IEntityType entityType)
         {
-            return entityType.GetProperties().Select(p => p.GetColumnName()).ToArray();
+            var tableIdentifier = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table);
+
+            return entityType.GetProperties().Select(p => p.GetColumnName(tableIdentifier.Value)).ToArray();
         }
 
         public static string GetActualSchema(this IEntityType entityType)
@@ -53,7 +55,9 @@ namespace EntityFrameworkCore.SqlChangeTracking
 
         public static string[] GetColumnNames(this IEntityType entityType, bool excludePrimaryKeyColumns)
         {
-            var primaryKeyColumnNames = entityType.FindPrimaryKey().Properties.Select(p => p.GetColumnName()).ToArray();
+            var tableIdentifier = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table);
+
+            var primaryKeyColumnNames = entityType.FindPrimaryKey().Properties.Select(p => p.GetColumnName(tableIdentifier.Value)).ToArray();
 
             return entityType.GetColumnNames().Where(c => !primaryKeyColumnNames.Contains(c)).ToArray();
         }

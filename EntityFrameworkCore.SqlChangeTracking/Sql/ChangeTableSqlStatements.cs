@@ -46,12 +46,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
                          {fullTableName} AS {EntityTablePrefix} ON ({onExpression})
                          ";
 
-            var discriminatorProperty = entityType.GetDiscriminatorProperty();
+            var discriminatorPropertyName = entityType.GetDiscriminatorPropertyName();
 
-            if (discriminatorProperty != null)
+            if (discriminatorPropertyName != null)
             {
                 var discriminatorValue = entityType.GetDiscriminatorValue();
-                sql += $" WHERE {discriminatorProperty.Name} = '{discriminatorValue}'";
+                sql += $" WHERE {discriminatorPropertyName} = '{discriminatorValue}'";
             }
 
             if (terminate)

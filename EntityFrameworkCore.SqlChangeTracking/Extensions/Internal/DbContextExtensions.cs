@@ -61,6 +61,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
             
             var propertyLookup = entityType.GetProperties().ToDictionary(p => p.Name, p => p);
 
+            var tableIdentifier = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table);
+
             foreach (var propertyInfo in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 if (!propertyLookup.TryGetValue(propertyInfo.Name, out var entityProperty))
@@ -68,7 +70,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
 
                 var valueConverter = propertyLookup[propertyInfo.Name].GetValueConverter()?.ConvertFromProvider ?? DefaultValueConverter;
                 
-                var columnName = entityProperty.GetColumnName();
+                var columnName = entityProperty.GetColumnName(tableIdentifier.Value);
 
                 var value = reader[columnName];
 
