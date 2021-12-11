@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring;
+using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +17,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 {
-    public class SyncEngine<TContext> : ISyncEngine where TContext : DbContext
+    class SyncEngine<TContext> : ISyncEngine where TContext : DbContext
     {
         ILogger<SyncEngine<TContext>> _logger;
         IServiceScopeFactory _serviceScopeFactory;
@@ -34,14 +35,17 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         bool _started = false;
 
+        SyncEngineOptions _options;
+
         public SyncEngine(
-            string syncContext,
+            SyncEngineOptions options,
             IServiceScopeFactory serviceScopeFactory,
             IDatabaseChangeMonitorManager databaseChangeMonitorManager,
             IChangeSetProcessor<TContext> changeSetProcessor,
             ILogger<SyncEngine<TContext>> logger = null)
         {
-            SyncContext = syncContext;
+            _options = options;
+            SyncContext = options.SyncContext;
             _serviceScopeFactory = serviceScopeFactory;
             _databaseChangeMonitorManager = databaseChangeMonitorManager;
             _changeSetProcessor = changeSetProcessor;
@@ -95,7 +99,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 foreach (var syncEngineEntityType in _syncEngineEntityTypes)
                 {
-                    await dbContext.InitializeSyncEngine(syncEngineEntityType, SyncContext).ConfigureAwait(false);
+                    await dbContext.InitializeSyncEngine(syncEngineEntityType, SyncContext, _options.MarkEntitiesAsSyncedOnInitialization).ConfigureAwait(false);
                 }
 
                 serviceScope.Dispose();

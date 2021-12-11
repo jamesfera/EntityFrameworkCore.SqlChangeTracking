@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring;
+using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,8 +19,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
     public interface ISyncEngineManager: ISyncManager
     {
-        ISyncEngine CreateSyncEngine<TContext>(string syncContext) where TContext : DbContext;
-        //void AddSyncEngine(ISyncEngine syncEngine, string syncContext);
+        ISyncEngine CreateSyncEngine<TContext>(SyncEngineOptions options) where TContext : DbContext;
     }
 
     public class SyncEngineManager : ISyncEngineManager
@@ -34,25 +34,18 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             _logger = logger ?? NullLogger<SyncEngineManager>.Instance;
         }
 
-        public ISyncEngine CreateSyncEngine<TContext>(string syncContext) where TContext : DbContext
+        public ISyncEngine CreateSyncEngine<TContext>(SyncEngineOptions options) where TContext : DbContext
         {
-            var key = $"{typeof(TContext)}:{syncContext}";
+            var key = $"{typeof(TContext)}:{options.SyncContext}";
 
             var syncEngine = _syncEngineInstances.GetOrAdd(key, k => new SyncEngine<TContext>(
-                syncContext,
+                options,
                 _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                 _serviceProvider.GetRequiredService<IDatabaseChangeMonitorManager>(),
                 _serviceProvider.GetRequiredService<IChangeSetProcessor<TContext>>(),
                 _serviceProvider.GetService<ILogger<SyncEngine<TContext>>>()));
 
             return syncEngine;
-        }
-
-        public void AddSyncEngine(ISyncEngine syncEngine, string syncContext)
-        {
-            var key = $"{syncEngine.DbContextType}{syncContext}";
-
-            _syncEngineInstances.TryAdd(key, syncEngine);
         }
 
         public ISyncEngine[] GetInstances() => _syncEngineInstances.Values.ToArray();
