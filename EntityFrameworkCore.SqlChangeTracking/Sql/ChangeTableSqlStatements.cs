@@ -14,8 +14,18 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
         {
             var fullTableName = entityType.GetFullTableName();
 
-            var sql = $@"SELECT MIN(SYS_CHANGE_VERSION) FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}
-                        WHERE SYS_CHANGE_VERSION > ({lastChangedVersion})";
+            var discriminatorPropertyName = entityType.GetDiscriminatorPropertyName();
+            var discriminatorValue = entityType.GetDiscriminatorValue();
+
+            var sql = $@"SELECT MIN(SYS_CHANGE_VERSION) FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}";
+
+            if (discriminatorValue != null)
+                sql += $" LEFT OUTER JOIN {fullTableName} AS {EntityTablePrefix}1 ON ({EntityTablePrefix}1.[Id] = {ChangeTablePrefix}.[Id])";
+
+            sql += $" WHERE SYS_CHANGE_VERSION > ({lastChangedVersion})";
+
+            if (discriminatorValue != null)
+                sql += $" AND {EntityTablePrefix}1.{discriminatorPropertyName} = '{discriminatorValue}'";
 
             return sql;
         }
