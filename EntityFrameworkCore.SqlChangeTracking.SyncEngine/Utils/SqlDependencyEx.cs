@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
+using EntityFrameworkCore.SqlChangeTracking.Logging;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
@@ -520,7 +521,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
         public Task NotificationTask { get; private set; }
         CancellationTokenSource? _cancellationTokenSource;
 
-        public async Task Start(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction = null)
+        public async Task Start(Func<SqlDependencyEx, TableChangedEventArgs, CancellationToken, Task> tableChangedAction, Func<SqlDependencyEx, Task>? stoppedFunc = null, Func<SqlDependencyEx, Exception, Task>? errorFunc = null)
         {
             //_logScope = Logger.BeginScope(new List<KeyValuePair<string, object>>()
             //{
@@ -546,7 +547,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
 
             _cancellationTokenSource = new CancellationTokenSource();
 
-            NotificationTask = NotificationLoop(tableChangedAction, stoppedAction, _cancellationTokenSource.Token);
+            NotificationTask = NotificationLoop(tableChangedAction, stoppedFunc, errorFunc, _cancellationTokenSource.Token);
         }
 
         public async ValueTask Stop()
@@ -560,8 +561,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
             await UninstallNotification().ConfigureAwait(false);
 
             lock (ActiveEntities)
-                if (ActiveEntities.Contains(Identity))
-                    ActiveEntities.Remove(Identity);
+                ActiveEntities.Remove(Identity);
         }
 
         public async ValueTask DisposeAsync()
@@ -569,16 +569,27 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
             await Stop();
         }
 
-        async Task NotificationLoop(Func<SqlDependencyEx, TableChangedEventArgs, Task> tableChangedAction, Action<SqlDependencyEx, Exception?>? stoppedAction, CancellationToken cancellationToken)
+        async Task NotificationLoop(Func<SqlDependencyEx, TableChangedEventArgs, CancellationToken, Task> tableChangedAction, Func<SqlDependencyEx, Task>? stoppedFunc, Func<SqlDependencyEx, Exception, Task>? errorFunc, CancellationToken cancellationToken)
         {
-            var commandText = string.Format(
+            var normalCommandText = string.Format(
                 SQL_FORMAT_RECEIVE_EVENT,
                 this.DatabaseName,
                 this.ConversationQueueName,
                 COMMAND_TIMEOUT / 2,
                 this.SchemaName);
 
-            while (true)
+            var errorStateCommandText = string.Format(
+                SQL_FORMAT_RECEIVE_EVENT,
+                this.DatabaseName,
+                this.ConversationQueueName,
+                5000,
+                this.SchemaName);
+
+            var commandText = normalCommandText;
+
+            bool error = false;
+
+            while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
@@ -586,7 +597,23 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                     {
                         Logger.LogTrace("Waiting for Sql Server Receive Event...");
 
-                        var message = await ReceiveEvent(commandText, cancellationToken).ConfigureAwait(false);
+                        string? message;
+
+                        try
+                        {
+                            message = await ReceiveEvent(commandText, cancellationToken).ConfigureAwait(false);
+
+                            if (error)
+                            {
+                                error = false;
+                                Logger.LogInformation("Notification Loop Restored to normal for Database: {DatabaseName} Table: {TableName}", DatabaseName, TableName);
+                                commandText = normalCommandText;
+                            }
+                        }
+                        catch (SqlException sqlException) when (sqlException.Errors.Cast<SqlError>().Any(e => e.Message.Contains("Operation cancelled by user.")))
+                        {
+                            break;
+                        }
 
                         //using var logScope = Logger.BeginScope(new List<KeyValuePair<string, object>>()
                         //{
@@ -596,33 +623,42 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                         Logger.LogTrace("Sql Server Event Received");
 
                         if (!string.IsNullOrWhiteSpace(message))
-                            await tableChangedAction(this, new TableChangedEventArgs(message)).ConfigureAwait(false);
+                        {
+                            try
+                            {
+                                await tableChangedAction(this, new TableChangedEventArgs(message), cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (TaskCanceledException ex) { }
+                            catch (Exception ex) when (Logger.LogErrorWithContext(ex, "Error Executing Table Changed Action for Database: {DatabaseName} Table: {TableName}", DatabaseName, TableName)) { }
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    if (ex is SqlException sqlException)
-                    {
-                        foreach (SqlError sqlError in sqlException.Errors)
-                        {
-                            if (sqlError.Message.Contains("Operation cancelled by user."))
-                            {
-                                stoppedAction?.Invoke(this, null);
-                                return;
-                            }
-                        }
-                    }
-
                     using var logContext = Logger.BeginScope(new List<KeyValuePair<string, object>>()
                     {
                         new KeyValuePair<string, object>("SqlEx:Identity", Identity),
                     });
 
-                    Logger.LogError(ex, "Error in Sql Notification Loop for Database: {DatabaseName} Table: {TableName}", DatabaseName, TableName);
+                    if (errorFunc != null)
+                        await errorFunc(this, ex).ConfigureAwait(false);
 
-                    stoppedAction?.Invoke(this, ex);
+                    if(cancellationToken.IsCancellationRequested)
+                        break;
+
+                    error = true;
+                    commandText = errorStateCommandText;
+
+                    var delay = TimeSpan.FromSeconds(5);
+
+                    Logger.LogError(ex, "Error in Sql Notification Loop for Database: {DatabaseName} Table: {TableName}. Waiting {Delay} Seconds...", DatabaseName, TableName, delay.TotalSeconds);
+
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
             }
+
+            if (stoppedFunc != null)
+                await stoppedFunc(this).ConfigureAwait(false);
         }
 
         async Task<string> ReceiveEvent(string commandText, CancellationToken cancellationToken)

@@ -121,19 +121,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                             o.SchemaName = entityType.GetActualSchema();
                             o.ConnectionString = connectionString;
 
-                            o.OnTableChanged = n =>
+                            o.OnTableChanged = (n, ct) =>
                             {
                                 _logger.LogDebug("Received Change notification for Table: {TableName} in Database: {DatabaseName}", n.Table, n.Database);
 
-                                return ProcessChanges(entityType, CancellationToken.None);
+                                return ProcessChanges(entityType, ct);
                             };
 
-                            o.OnChangeMonitorTerminated = (monitor, table, application, ex) =>
+                            o.OnChangeMonitorStopped = (monitor, table, application) =>
                             {
-                                if (ex == null)
-                                    _logger.LogInformation("Table change listener terminated for table: {TableName} database: {DatabaseName}", table, monitor.DatabaseName);
-                                else
-                                    _logger.LogCritical(ex, "Table change listener terminated for table: {TableName} database: {DatabaseName}", table, monitor.DatabaseName);
+                                _logger.LogInformation("Table change listener terminated for table: {TableName} database: {DatabaseName}", table, monitor.DatabaseName);
 
                                 return Task.CompletedTask;
                             };

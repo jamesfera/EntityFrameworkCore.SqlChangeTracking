@@ -178,11 +178,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
                     var sqlTableDependency = new SqlDependencyEx(registrationKey, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
 
-                    await sqlTableDependency.Start(TableChangedEventHandler, async (sqlEx, ex) =>
-                    {
-                        if (changeRegistration.Options.OnChangeMonitorTerminated != null)
-                            await changeRegistration.Options.OnChangeMonitorTerminated.Invoke(this, fullTableName, options.ApplicationName, ex);
-                    });
+                    await sqlTableDependency.Start(TableChangedEventHandler, async sqlEx =>
+                        {
+                            if (changeRegistration.Options.OnChangeMonitorStopped != null)
+                                await changeRegistration.Options.OnChangeMonitorStopped(this, fullTableName, options.ApplicationName).ConfigureAwait(false);
+                        }
+                    );
 
                     _logger.LogInformation("Created Change Event Listener in Database: {DatabaseName} for table {TableName} with identity: {SqlDependencyId}", DatabaseName, fullTableName, registrationKey);
 
@@ -195,7 +196,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
         {
             foreach (var registrationKey in _sqlDependencies.Keys)
             {
-                await removeTableChangeListener(registrationKey);
+                await removeTableChangeListener(registrationKey).ConfigureAwait(false);
             }
         }
 
@@ -206,10 +207,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
             var sqlEx = sqlExTask.Result;
 
-            await sqlEx.Stop();
+            await sqlEx.Stop().ConfigureAwait(false);
         }
 
-        async Task TableChangedEventHandler(SqlDependencyEx sqlEx, SqlDependencyEx.TableChangedEventArgs e)
+        async Task TableChangedEventHandler(SqlDependencyEx sqlEx, SqlDependencyEx.TableChangedEventArgs e, CancellationToken cancellationToken)
         {
             string? tableName = null;
 
@@ -237,7 +238,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
                         try
                         {
-                            await a.ChangeFunc(notification);
+                            await a.ChangeFunc(notification, cancellationToken).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
@@ -284,7 +285,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
             public DatabaseChangeMonitorRegistrationOptions Options { get; }
 
-            public Func<ITableChangedNotification, Task> ChangeFunc => Options.OnTableChanged;
+            public Func<ITableChangedNotification, CancellationToken, Task> ChangeFunc => Options.OnTableChanged;
 
             Func<ChangeRegistration, Task> _registrationRemovedAction;
 
@@ -312,8 +313,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
         public string SchemaName { get; set; } = "dbo";
         public string ConnectionString { get; set; }
 
-        public Func<ITableChangedNotification, Task> OnTableChanged { get; set; }
-
-        public Func<IDatabaseChangeMonitor, string, string, Exception?, Task>? OnChangeMonitorTerminated { get; set; }
+        public Func<ITableChangedNotification, CancellationToken, Task> OnTableChanged { get; set; }
+        public Func<IDatabaseChangeMonitor, string, string, Task>? OnChangeMonitorStopped { get; set; }
     }
 }
