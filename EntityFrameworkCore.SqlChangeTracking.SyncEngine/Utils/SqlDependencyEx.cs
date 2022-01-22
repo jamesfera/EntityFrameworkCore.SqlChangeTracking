@@ -606,7 +606,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                             if (error)
                             {
                                 error = false;
-                                Logger.LogInformation("Notification Loop Restored to normal for Database: {DatabaseName} Table: {TableName}", DatabaseName, TableName);
+                                Logger.LogInformation("Notification Loop Restored to normal for Database: {DatabaseName} Table: {TableName}. Exiting faulted state", DatabaseName, TableName);
                                 commandText = normalCommandText;
                             }
                         }
@@ -646,12 +646,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
                     if(cancellationToken.IsCancellationRequested)
                         break;
 
-                    error = true;
-                    commandText = errorStateCommandText;
-
                     var delay = TimeSpan.FromSeconds(5);
 
-                    Logger.LogError(ex, "Error in Sql Notification Loop for Database: {DatabaseName} Table: {TableName}. Waiting {Delay} Seconds...", DatabaseName, TableName, delay.TotalSeconds);
+                    if (!error)
+                        Logger.LogError(ex, "Error in Sql Notification Loop for Database: {DatabaseName} Table: {TableName}. Entering faulted state. Will retry every {Delay} seconds...", DatabaseName, TableName, delay.TotalSeconds);
+
+                    error = true;
+                    commandText = errorStateCommandText;
 
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
