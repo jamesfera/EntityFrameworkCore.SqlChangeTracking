@@ -172,23 +172,32 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
                 var options = changeRegistration.Options;
 
-                await _sqlDependencies.GetOrAdd(registrationKey, async k =>
+                try
+                {
+                    await _sqlDependencies.GetOrAdd(registrationKey, async k =>
+                    {
+                        var fullTableName = $"{options.SchemaName}.{options.TableName}";
+
+                        var sqlTableDependency = new SqlDependencyEx(registrationKey, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
+
+                        await sqlTableDependency.Start(TableChangedEventHandler, async sqlEx =>
+                            {
+                                if (changeRegistration.Options.OnChangeMonitorStopped != null)
+                                    await changeRegistration.Options.OnChangeMonitorStopped(this, fullTableName, options.ApplicationName).ConfigureAwait(false);
+                            }
+                        );
+
+                        _logger.LogInformation("Created Change Event Listener in Database: {DatabaseName} Table: {TableName} with Identity: {SqlDependencyId}", DatabaseName, fullTableName, registrationKey);
+
+                        return sqlTableDependency;
+                    });
+                }
+                catch (Exception ex)
                 {
                     var fullTableName = $"{options.SchemaName}.{options.TableName}";
-
-                    var sqlTableDependency = new SqlDependencyEx(registrationKey, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
-
-                    await sqlTableDependency.Start(TableChangedEventHandler, async sqlEx =>
-                        {
-                            if (changeRegistration.Options.OnChangeMonitorStopped != null)
-                                await changeRegistration.Options.OnChangeMonitorStopped(this, fullTableName, options.ApplicationName).ConfigureAwait(false);
-                        }
-                    );
-
-                    _logger.LogInformation("Created Change Event Listener in Database: {DatabaseName} for table {TableName} with identity: {SqlDependencyId}", DatabaseName, fullTableName, registrationKey);
-
-                    return sqlTableDependency;
-                });
+                    _logger.LogCritical(ex, "Error Starting Change Monitor for Database: {DatabaseName} Table: {TableName} with Identity: {SqlDependencyId}", DatabaseName, fullTableName, registrationKey);
+                    throw;
+                }
             }
         }
 

@@ -735,20 +735,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Utils
             await using var conn = new SqlConnection(connectionString);
             await using var command = new SqlCommand(commandText, conn);
 
-            try
-            {
-                await conn.OpenAsync().ConfigureAwait(false);
+            await conn.OpenAsync().ConfigureAwait(false);
 
-                command.CommandType = CommandType.Text;
+            command.CommandType = CommandType.Text;
 
-                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error executing Non Query");
-            }
+            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
-
         private string GetUninstallNotificationProcedureScript()
         {
             string uninstallServiceBrokerNotificationScript = string.Format(
