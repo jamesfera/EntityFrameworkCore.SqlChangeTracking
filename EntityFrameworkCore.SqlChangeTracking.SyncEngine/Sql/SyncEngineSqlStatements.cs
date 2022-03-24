@@ -28,7 +28,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
 
             previousPageToken ??= 0;
 
-            var sql = $"SELECT TOP {BatchSize} {columnNames} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} ORDER BY {primaryKeyColumns}";
+            var discriminatorValue = entityType.GetDiscriminatorValue();
+            string discriminator = string.Empty;
+
+            if (discriminatorValue != null)
+                discriminator = $"AND {entityType.GetDiscriminatorPropertyName()} = '{discriminatorValue}'";
+
+            var sql = $"SELECT TOP {BatchSize} {columnNames} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} {discriminator} ORDER BY {primaryKeyColumns}";
 
             return sql;
         }

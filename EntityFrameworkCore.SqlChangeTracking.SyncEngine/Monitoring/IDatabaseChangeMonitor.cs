@@ -257,7 +257,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
                     try
                     {
-                        await Task.WhenAll(tasks);
+                        await Task.WhenAll(tasks).ConfigureAwait(false);
                     }
                     finally
                     {
@@ -280,7 +280,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
         {
             if (!_disposed)
             {
-                await Disable();
+                await Disable().ConfigureAwait(false);
 
                 _registeredChangeActions = null;
 
@@ -309,7 +309,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
 
             public async ValueTask DisposeAsync()
             {
-                await _registrationRemovedAction(this);
+                await _registrationRemovedAction(this).ConfigureAwait(false);
             }
         }
     }
