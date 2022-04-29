@@ -181,11 +181,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
                         var sqlTableDependency = new SqlDependencyEx(registrationKey, _loggerFactory?.CreateLogger<SqlDependencyEx>() ?? NullLogger<SqlDependencyEx>.Instance, options.ConnectionString, DatabaseName, options.TableName, options.SchemaName, receiveDetails: true);
 
                         await sqlTableDependency.Start(TableChangedEventHandler, async sqlEx =>
-                            {
-                                if (changeRegistration.Options.OnChangeMonitorStopped != null)
-                                    await changeRegistration.Options.OnChangeMonitorStopped(this, fullTableName, options.ApplicationName).ConfigureAwait(false);
-                            }
-                        );
+                        {
+                            if (changeRegistration.Options.OnChangeMonitorStopped != null)
+                                await changeRegistration.Options.OnChangeMonitorStopped(this, fullTableName, options.ApplicationName).ConfigureAwait(false);
+                        });
 
                         _logger.LogInformation("Created Change Event Listener in Database: {DatabaseName} Table: {TableName} with Identity: {SqlDependencyId}", DatabaseName, fullTableName, registrationKey);
 
@@ -233,14 +232,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
                     return;
                 }
 
-                _logger.LogDebug("Change detected in table: {TableName} ", tableName);
+                _logger.LogDebug("Change detected in Table: {TableName} Database: {DatabaseName}", tableName, DatabaseName);
 
                 var registrationKey = sqlEx.Identity;
 
                 if (_registeredChangeActions.TryGetValue(registrationKey, out ImmutableList<ChangeRegistration> actions))
                 {
-                    //await _semaphore.WaitAsync();
-                    
                     var tasks = actions.Select(async a =>
                     {
                         var notification = new TableChangedNotification(sqlEx.DatabaseName, sqlEx.TableName, sqlEx.SchemaName, e.NotificationType.ToChangeOperation());
@@ -255,14 +252,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
                         }
                     });
 
-                    try
-                    {
-                        await Task.WhenAll(tasks).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        //_semaphore.Release();
-                    }
+                    Task.WhenAll(tasks).ConfigureAwait(false);
                 }
                 else //this should never happen
                 {
@@ -271,7 +261,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing Change Event for Table: {TableName}", tableName);
+                _logger.LogError(ex, "Error processing Change Event for Table: {TableName} Database: {DatabaseName}", tableName, DatabaseName);
             }
         }
 
