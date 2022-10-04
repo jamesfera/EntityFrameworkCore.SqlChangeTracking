@@ -11,7 +11,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
     {
         DbSet<T> DbSet { get; }
         IAsyncEnumerable<IChangeTrackingEntry<T>> Next(long lastVersion);
-        IAsyncEnumerable<IChangeTrackingEntry<T>> All(long lastVersion);
+        //IAsyncEnumerable<IChangeTrackingEntry<T>> All(long lastVersion);
     }
 
     internal class ChangesQueryContext<T> : IChangesQueryContext<T> where T : class, new()
@@ -32,14 +32,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions
             return dbContext.Next<T>(entityType, lastVersion);
         }
 
-        public IAsyncEnumerable<IChangeTrackingEntry<T>> All(long lastVersion)
-        {
-            var dbContext = DbSet.GetService<ICurrentDbContext>().Context;
+        //public IAsyncEnumerable<IChangeTrackingEntry<T>> All(long lastVersion)
+        //{
+        //    var dbContext = DbSet.GetService<ICurrentDbContext>().Context;
 
-            var entityType = dbContext.Model.FindEntityType(typeof(T));
+        //    var entityType = dbContext.Model.FindEntityType(typeof(T));
 
-            return dbContext.All<T>(entityType, lastVersion);
-        }
+        //    return dbContext.All<T>(entityType, lastVersion);
+        //}
     }
 
 }

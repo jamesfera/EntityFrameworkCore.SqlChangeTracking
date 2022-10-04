@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.AsyncLinqExtensions;
 using EntityFrameworkCore.SqlChangeTracking.Extensions.Internal;
 using EntityFrameworkCore.SqlChangeTracking.Models;
+using EntityFrameworkCore.SqlChangeTracking.Sql;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Models;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql;
 using Microsoft.Data.SqlClient;
@@ -23,7 +23,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
 
             var lastChangedVersion = await db.GetLastChangeVersionAsync(entityType, syncContext);
 
-            var sql = SyncEngineSqlStatements.GetNextChangeSetExpression(entityType, lastChangedVersion);
+            var sql = ChangeTableSqlStatements.GetNextChangeSetExpression(entityType, lastChangedVersion);
 
             return await db.ToChangeSet<T>(sql).ToArrayAsync();
         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
@@ -14,6 +15,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             entityTypeBuilder.WithSqlChangeTracking();
 
             entityTypeBuilder.Metadata.EnableSyncEngine(syncContext);
+
+            entityTypeBuilder.ToTable(t => t.HasTrigger("sync_trigger"));
            
             return entityTypeBuilder;
         }

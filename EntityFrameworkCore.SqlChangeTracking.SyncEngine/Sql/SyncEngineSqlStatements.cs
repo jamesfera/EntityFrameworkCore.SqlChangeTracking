@@ -39,21 +39,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
             return sql;
         }
 
-        public static string GetNextChangeSetExpression(IEntityType entityType, long? lastChangedVersion)
-        {
-            var sql = ChangeTableSqlStatements.GetNextChangeSetExpression(entityType, lastChangedVersion);
+        //public static string GetNextChangeSetExpression(IEntityType entityType, long? lastChangedVersion) => ChangeTableSqlStatements.GetNextChangeSetExpression(entityType, lastChangedVersion);
 
-            return sql;
-        }
+        //public static string GetAllChangeSetsExpression(IEntityType entityType, long? lastChangedVersion)
+        //{
+        //    var sql = $@"{ChangeTableSqlStatements.GetAllChangeSetsExpression(entityType, lastChangedVersion, false)}
+        //                WHERE SYS_CHANGE_VERSION > ({lastChangedVersion})
+        //                ORDER BY SYS_CHANGE_VERSION";
 
-        public static string GetAllChangeSetsExpression(IEntityType entityType, long? lastChangedVersion)
-        {
-            var sql = $@"{ChangeTableSqlStatements.GetAllChangeSetsExpression(entityType, lastChangedVersion, false)}
-                        WHERE SYS_CHANGE_VERSION > ({lastChangedVersion})
-                        ORDER BY SYS_CHANGE_VERSION";
-
-            return sql;
-        }
+        //    return sql;
+        //}
 
         public static string GetLastChangeVersionExpression(IEntityType entityType, string syncContext)
         {

@@ -20,14 +20,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Extensions.Internal
             return new AsyncEnumerableWrapper<T>(context.ToChangeSet<T>(sql), sql);
         }
 
-        public static IAsyncEnumerable<IChangeTrackingEntry<T>> All<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
-        {
-            Validate(entityType);
+        //public static IAsyncEnumerable<IChangeTrackingEntry<T>> All<T>(this DbContext context, IEntityType entityType, long version) where T : class, new()
+        //{
+        //    Validate(entityType);
 
-            var sql = ChangeTableSqlStatements.GetAllChangeSetsExpression(entityType, version, true);
+        //    var sql = ChangeTableSqlStatements.GetAllChangeSetsExpression(entityType, version, true);
 
-            return new AsyncEnumerableWrapper<T>(context.ToChangeSet<T>(sql), sql);
-        }
+        //    return new AsyncEnumerableWrapper<T>(context.ToChangeSet<T>(sql), sql);
+        //}
 
         static void Validate(IEntityType entityType)
         {
