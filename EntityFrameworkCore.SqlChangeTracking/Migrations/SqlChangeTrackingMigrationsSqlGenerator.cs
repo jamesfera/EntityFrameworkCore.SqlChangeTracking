@@ -1,19 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices.ComTypes;
-using System.Text;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using Microsoft.EntityFrameworkCore.Update;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 {
     public class SqlChangeTrackingMigrationsSqlGenerator : SqlServerMigrationsSqlGenerator
     {
-        public SqlChangeTrackingMigrationsSqlGenerator(MigrationsSqlGeneratorDependencies dependencies, IRelationalAnnotationProvider migrationsAnnotations) : base(dependencies, migrationsAnnotations) { }
+        public SqlChangeTrackingMigrationsSqlGenerator(MigrationsSqlGeneratorDependencies dependencies, ICommandBatchPreparer commandBatchPreparer) : base(dependencies, commandBatchPreparer) { }
         
         void Generate(EnableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
         {

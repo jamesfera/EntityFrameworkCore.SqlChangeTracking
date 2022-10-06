@@ -40,11 +40,22 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
             {
                 var param = Expression.Parameter(typeof(IChangeTrackingEntry<T>), "p");
 
-                var exp = Expression.Lambda<Func<IChangeTrackingEntry<T>, long>>(Expression.Convert(Expression.Property(Expression.Property(param, "Entry"), "Id"), typeof(long)), param).Compile();
+                try
+                {
+                    var pkPropertyExpression = Expression.Lambda<Func<IChangeTrackingEntry<T>, int>>(Expression.Convert(Expression.Property(param, "PrimaryKey"), typeof(int)), param);
 
-                var max = results.Max(exp);
+                    var max = results.AsQueryable().Max(pkPropertyExpression);
 
-                return (results, max);
+                    return (results, max);
+                }
+                catch
+                {
+                    var pkPropertyExpression = Expression.Lambda<Func<IChangeTrackingEntry<T>, long>>(Expression.Convert(Expression.Property(param, "PrimaryKey"), typeof(long)), param);
+
+                    var max = results.AsQueryable().Max(pkPropertyExpression);
+
+                    return (results, max);
+                }
             }
 
             return (results, null);
