@@ -42,7 +42,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
 
                 try
                 {
-                    var pkPropertyExpression = Expression.Lambda<Func<IChangeTrackingEntry<T>, int>>(Expression.Convert(Expression.Property(param, "PrimaryKey"), typeof(int)), param);
+                    var pkPropertyExpression = Expression.Lambda<Func<IChangeTrackingEntry<T>, int>>(Expression.Convert(Expression.Property(param, nameof(IChangeTrackingEntry<T>.PrimaryKey)), typeof(int)), param);
 
                     var max = results.AsQueryable().Max(pkPropertyExpression);
 
@@ -50,7 +50,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
                 }
                 catch
                 {
-                    var pkPropertyExpression = Expression.Lambda<Func<IChangeTrackingEntry<T>, long>>(Expression.Convert(Expression.Property(param, "PrimaryKey"), typeof(long)), param);
+                    var pkPropertyExpression = Expression.Lambda<Func<IChangeTrackingEntry<T>, long>>(Expression.Convert(Expression.Property(param, nameof(IChangeTrackingEntry<T>.PrimaryKey)), typeof(long)), param);
 
                     var max = results.AsQueryable().Max(pkPropertyExpression);
 
