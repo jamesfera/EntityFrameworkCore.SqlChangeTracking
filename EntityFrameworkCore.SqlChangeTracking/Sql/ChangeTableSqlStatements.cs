@@ -32,69 +32,43 @@ namespace EntityFrameworkCore.SqlChangeTracking.Sql
 
         public static string GetNextChangeSetExpression(IEntityType entityType, long? lastChangedVersion)
         {
-            var allChangesSql = GetAllChangeSetsExpression(entityType, lastChangedVersion);
+            var allChangesSql = GetAllChangeSetsExpression(entityType, lastChangedVersion, false);
 
-            return allChangesSql.Replace("SELECT", "SELECT TOP 1");
+            var sql = $@"{allChangesSql}
+                            {(allChangesSql.Contains("WHERE") ? "AND" : "WHERE")} SYS_CHANGE_VERSION = ({GetNextChangeVersionExpression(entityType, lastChangedVersion)})";
+
+            return sql;
         }
 
-        public static string GetAllChangeSetsExpression(IEntityType entityType, long? lastChangedVersion)
+        public static string GetAllChangeSetsExpression(IEntityType entityType, long? lastChangedVersion, bool terminate)
         {
             var fullTableName = entityType.GetFullTableName();
-            
-            var pkColumnNames = new StringBuilder(string.Join(",", entityType.GetPrimaryKeyColumnNames().Select(p => $"{ChangeTablePrefix}.[{p}]")));
 
-            var columnNames = pkColumnNames.Append(", ").Append(ChangeTrackingColumnNames);
+            var entityColumnNames = GetEntityColumnNames(entityType, ChangeTablePrefix, EntityTablePrefix);
+
+            var columnNames = entityColumnNames.Append(", ").Append(ChangeTrackingColumnNames);
+
+            var onExpression = GetJoinConditionExpression(entityType, EntityTablePrefix, ChangeTablePrefix);
 
             var sql = $@"SELECT {columnNames}
-                         FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}";
+                         FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}
+                         LEFT OUTER JOIN
+                         {fullTableName} AS {EntityTablePrefix} ON ({onExpression})
+                         ";
 
             var discriminatorPropertyName = entityType.GetDiscriminatorPropertyName();
 
             if (discriminatorPropertyName != null)
             {
-                var onExpression = GetJoinConditionExpression(entityType, EntityTablePrefix, ChangeTablePrefix);
-
                 var discriminatorValue = entityType.GetDiscriminatorValue();
-
-                sql += $@" LEFT OUTER JOIN
-                             {fullTableName} AS {EntityTablePrefix} ON ({onExpression})
-                             WHERE {discriminatorPropertyName} = '{discriminatorValue}'";
+                sql += $" WHERE {discriminatorPropertyName} = '{discriminatorValue}'";
             }
 
-            sql += " ORDER BY SYS_CHANGE_VERSION";
+            if (terminate)
+                sql += " ORDER BY SYS_CHANGE_VERSION";
 
             return sql;
         }
-
-        //public static string GetAllChangeSetsExpression(IEntityType entityType, long? lastChangedVersion, bool terminate)
-        //{
-        //    var fullTableName = entityType.GetFullTableName();
-
-        //    var entityColumnNames = GetEntityColumnNames(entityType, ChangeTablePrefix, EntityTablePrefix);
-
-        //    var columnNames = entityColumnNames.Append(", ").Append(ChangeTrackingColumnNames);
-
-        //    var onExpression = GetJoinConditionExpression(entityType, EntityTablePrefix, ChangeTablePrefix);
-
-        //    var sql = $@"SELECT {columnNames}
-        //                 FROM CHANGETABLE(CHANGES {fullTableName}, {lastChangedVersion}) AS {ChangeTablePrefix}
-        //                 LEFT OUTER JOIN
-        //                 {fullTableName} AS {EntityTablePrefix} ON ({onExpression})
-        //                 ";
-
-        //    var discriminatorPropertyName = entityType.GetDiscriminatorPropertyName();
-
-        //    if (discriminatorPropertyName != null)
-        //    {
-        //        var discriminatorValue = entityType.GetDiscriminatorValue();
-        //        sql += $" WHERE {discriminatorPropertyName} = '{discriminatorValue}'";
-        //    }
-
-        //    if (terminate)
-        //        sql += " ORDER BY SYS_CHANGE_VERSION";
-
-        //    return sql;
-        //}
 
         public static StringBuilder GetEntityColumnNames(IEntityType entityType, string pkPrefix, string columnPrefix)
         {
