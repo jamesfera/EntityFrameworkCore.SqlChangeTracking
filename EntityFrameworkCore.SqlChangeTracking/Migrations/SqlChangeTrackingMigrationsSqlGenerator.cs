@@ -119,10 +119,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
         protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
             base.Generate(operation, model, builder);
-
-            if (operation.IsChangeTrackingEnabled())
+            
+            if (operation.IsChangeTrackingEnabled() && !operation.OldTable.IsChangeTrackingEnabled())
                 Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
-            else if(operation.OldTable.IsChangeTrackingEnabled())
+            else if(!operation.IsChangeTrackingEnabled() && operation.OldTable.IsChangeTrackingEnabled())
                 Generate(new DisableChangeTrackingForTableOperation(operation.Name, operation.Schema), model, builder);
         }
 
