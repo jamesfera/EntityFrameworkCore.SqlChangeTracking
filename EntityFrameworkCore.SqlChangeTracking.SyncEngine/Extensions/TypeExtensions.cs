@@ -23,10 +23,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
     {
         static Type ProcessorInterfaceType = typeof(IChangeSetBatchProcessor<,>);
 
-        public static bool IsChangeProcessorForType<TContext>(this Type type, Type processorType) where TContext : DbContext
-        {
-            return type.IsChangeProcessor<TContext>() && type.GetTypesForChangeProcessor<TContext>().Any(t => t == processorType);
-        }
+        //public static bool IsChangeProcessorForType<TContext>(this Type type, Type processorType) where TContext : DbContext
+        //{
+        //    return type.IsChangeProcessor<TContext>() && type.GetTypesForChangeProcessor<TContext>().Any(t => t == processorType);
+        //}
 
         public static bool IsChangeProcessor<TContext>(this Type type) where TContext : DbContext
         {

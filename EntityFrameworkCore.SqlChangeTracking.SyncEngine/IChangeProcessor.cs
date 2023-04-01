@@ -1,67 +1,60 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using EntityFrameworkCore.SqlChangeTracking.AsyncLinqExtensions;
-using EntityFrameworkCore.SqlChangeTracking.Models;
-using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
+﻿using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.EntityFrameworkCore.Internal;
+
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 {
     public interface IChangeSetProcessorRegistration
     {
-        KeyValuePair<string, Type> Registration { get; }
+        (string syncContext, Type processorType, Func<Type, bool> entityTypeFilter) Registration { get; }
     }
 
     public class ChangeSetProcessorRegistration : IChangeSetProcessorRegistration
     {
-        public ChangeSetProcessorRegistration(KeyValuePair<string, Type> registration)
+        public ChangeSetProcessorRegistration((string syncContext, Type processorType, Func<Type, bool> entityTypeFilter) registration)
         {
             Registration = registration;
         }
 
-        public KeyValuePair<string, Type> Registration { get; }
+        public (string syncContext, Type processorType, Func<Type, bool> entityTypeFilter) Registration { get; }
     }
 
     public interface IProcessorTypeRegistry<TContext> where TContext : DbContext
     {
-        Type[] GetProcessorTypesForSyncContext(string syncContext);
+        (Type processorType, Func<Type, bool> entityTypeFilter)[] GetProcessorTypesForSyncContext(string syncContext);
         Type[] GetProcessorTypesForEntity(Type entityType, string syncContext);
         bool HasBatchProcessor(Type entityType, string syncContext);
     }
 
     public class ProcessorTypeRegistry<TContext> : IProcessorTypeRegistry<TContext> where TContext : DbContext
     {
-        Dictionary<string, Type[]> _registrations;
+        Dictionary<string, (Type processorType, Func<Type, bool> entityTypeFilter)[]> _registrations;
 
         public ProcessorTypeRegistry(IEnumerable<IChangeSetProcessorRegistration> registrations)
         {
-            _registrations = registrations.Select(r => r.Registration).GroupBy(r => r.Key, r => r.Value).ToDictionary(g => g.Key, g => g.Distinct().ToArray());
+            _registrations = registrations.Select(r => r.Registration).GroupBy(r => r.syncContext, r => (r.processorType, r.entityTypeFilter)).ToDictionary(g => g.Key, g => g.Distinct().ToArray());
         }
 
         public Type[] GetProcessorTypesForEntity(Type entityType, string syncContext)
         {
             var entityTypesToMatch = entityType.GetAssignableTypesForEntity();
 
-            var entityProcessorTypes = GetProcessorTypesForSyncContext(syncContext).Where(p => entityTypesToMatch.Contains(p.GenericTypeArguments[0]) && p.GenericTypeArguments[1] == typeof(TContext)).ToArray();
+            var entityProcessorTypes = GetProcessorTypesForSyncContext(syncContext).Where(p =>
+            {
+                var processorEntityTypes = p.processorType.GetTypesForChangeProcessor<TContext>().Where(t => p.entityTypeFilter(t)).ToArray();
+                return entityTypesToMatch.Intersect(processorEntityTypes).Any();
+            })
+                .Select(p => p.processorType)
+                .ToArray();
 
             return entityProcessorTypes;
         }
 
-        public Type[] GetProcessorTypesForSyncContext(string syncContext)
+        public (Type processorType, Func<Type, bool> entityTypeFilter)[] GetProcessorTypesForSyncContext(string syncContext)
         {
-            if (!_registrations.TryGetValue(syncContext, out Type[] serviceTypes))
-                _registrations.Add(syncContext, serviceTypes = new Type[0]);
+            if (!_registrations.TryGetValue(syncContext, out (Type processorType, Func<Type, bool> entityTypeFilter)[] serviceTypes))
+                _registrations.Add(syncContext, serviceTypes = Array.Empty<(Type processorType, Func<Type, bool> entityTypeFilter)>());
 
             return serviceTypes;
         }
