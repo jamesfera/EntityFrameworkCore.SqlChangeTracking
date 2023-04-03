@@ -172,7 +172,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
             try
             {
-                await semaphore.WaitAsync();
+                await semaphore.WaitAsync(cancellationToken);
 
                 _logger.LogDebug("Processing changes for Entity: {EntityType}", entityType.ClrType);
 
