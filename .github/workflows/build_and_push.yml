@@ -1,4 +1,4 @@
-name: .NET Core Develop
+name: Build and Nuget Publish
 
 on:
   push:
@@ -10,22 +10,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-        with:        
+      - uses: actions/checkout@v3.5.0
+        with:
           fetch-depth: 0
 
-      - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v0.9.7
-        with:
-          versionSpec: '5.5.0'
-
-      - name: Configure GitVersion
-        shell: bash
+      - name: Determine Build Version
+        id: determine_build_version
         run: |
-          echo "mode: Mainline" > GitVersion.yml
-          echo "branches: {}" >> GitVersion.yml
-          echo "ignore:" >> GitVersion.yml
-          echo "  sha: []" >> GitVersion.yml
+          dotnet tool restore
+          dotnet gitversion /output buildserver
 
       - name: Install NuGet client
         uses: nuget/setup-nuget@v1
@@ -36,31 +29,7 @@ jobs:
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: 7.0.x
-          include-prerelease: true
-
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 6.0.x
-          include-prerelease: true
-
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 5.0.x
-
-      # required by dotnet-setversion
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 3.1.404
-
-      - name: Determine Version
-        id:   gitversion
-        uses: gittools/actions/gitversion/execute@v0.9.7
-        # with:
-        #   additionalArguments: '/showConfig'
+          dotnet-version: 7.0.x          
 
       - name: Build with dotnet
         run: |
