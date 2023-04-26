@@ -35,7 +35,7 @@ jobs:
         run: |
           nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }} -StorePasswordInClearText
           dotnet tool install -g dotnet-setversion
-          setversion -r $GITVERSION_FULLSEMVER
+          setversion -r ${{env.GitVersion_FullSemVer}}
           dotnet build --configuration Release
 
       # - name: Test with dotnet
