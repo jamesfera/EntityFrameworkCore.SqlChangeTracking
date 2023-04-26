@@ -19,8 +19,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         Task ProcessChanges(IEntityType entityType, CancellationToken cancellationToken);
         Task ProcessChanges(string entityTypeName, CancellationToken cancellationToken);
 
-        Task ProcessDataSet(IEntityType entityType, CancellationToken cancellationToken);
-        Task ProcessDataSet(string entityTypeName, CancellationToken cancellationToken);
+        Task ProcessDataSet(IEntityType entityType, string? primaryKeyStart, CancellationToken cancellationToken);
+        Task ProcessDataSet(string entityTypeName, string? primaryKeyStart, CancellationToken cancellationToken);
 
         Task SetChangeVersion(string entityName, long changeVersion);
         Task SetChangeVersion(IEntityType entityType, long changeVersion);

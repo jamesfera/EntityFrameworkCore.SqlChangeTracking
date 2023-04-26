@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Concurrent;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Monitoring;
@@ -198,7 +193,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         ConcurrentDictionary<string, bool> _entityDataSetProcessingMonitors = new ConcurrentDictionary<string, bool>();
 
-        public async Task ProcessDataSet(IEntityType entityType, CancellationToken cancellationToken)
+        public async Task ProcessDataSet(IEntityType entityType, string? primaryKeyStart, CancellationToken cancellationToken)
         {
             validateEntityType(entityType);
 
@@ -207,9 +202,12 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
             try
             {
-                _logger.LogInformation("Processing entire data set for Entity: {EntityType}", entityType.ClrType);
-               
-                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, cancellationToken).ConfigureAwait(false);
+                if (primaryKeyStart == null)
+                    _logger.LogInformation("Processing entire data set for Entity: {EntityType}", entityType.ClrType);
+                else
+                    _logger.LogInformation("Processing entire data set for Entity: {EntityType} starting above Primary Key: {PrimaryKey}", entityType.ClrType, primaryKeyStart);
+
+                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, primaryKeyStart, cancellationToken).ConfigureAwait(false);
 
                 _logger.LogInformation("Completed processing entire data set for Entity: {EntityType}", entityType.ClrType);
             }
@@ -224,11 +222,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
         }
 
-        public Task ProcessDataSet(string entityTypeName, CancellationToken cancellationToken)
+        public Task ProcessDataSet(string entityTypeName, string? primaryKeyStart, CancellationToken cancellationToken)
         {
             var entityType = validateEntityName(entityTypeName);
 
-            return ProcessDataSet(entityType, cancellationToken);
+            return ProcessDataSet(entityType, primaryKeyStart, cancellationToken);
         }
 
         public async Task MarkEntityAsSynced(IEntityType entityType)

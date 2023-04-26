@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using EntityFrameworkCore.SqlChangeTracking.Logging;
 using EntityFrameworkCore.SqlChangeTracking.Models;
 using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions;
@@ -24,6 +19,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
     {
         object _previousPageToken = null;
 
+        public DataSetState() { }
+        public DataSetState(string? primaryKeyStart) => _previousPageToken = primaryKeyStart;
+
         public async ValueTask<IChangeTrackingEntry<TEntity>[]> T1(DbContext dbContext, string syncContext)
         {
             var result = await dbContext.NextDataSetHelper<TEntity>(_previousPageToken);
@@ -38,7 +36,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
     public interface IChangeSetProcessor<TContext> where TContext : DbContext
     {
         Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken);
-        Task ProcessEntireDataSet(IEntityType entityType, string syncContext, CancellationToken cancellationToken);
+        Task ProcessEntireDataSet(IEntityType entityType, string syncContext, string? primaryKeyStart, CancellationToken cancellationToken);
     }
 
     public class ChangeSetProcessor<TContext> : IChangeSetProcessor<TContext> where TContext : DbContext
@@ -54,7 +52,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         public Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getNextChangeSetFunc(entityType), ChangeBatchType.Changes, cancellationToken);
 
-        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType), ChangeBatchType.DataSet, cancellationToken);
+        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext, string? primaryKeyStart, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType, primaryKeyStart), ChangeBatchType.DataSet, cancellationToken);
 
         async Task ProcessInternal(IEntityType entityType, string syncContext, Delegate getNextBatchDelegate, ChangeBatchType changeBatchType, CancellationToken cancellationToken)
         {
@@ -180,11 +178,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             return batch;
         }
 
-        Delegate getEntireDataSetFunc(IEntityType entityType)
+        Delegate getEntireDataSetFunc(IEntityType entityType, string? primaryKeyStart)
         {
             var stateType = typeof(DataSetState<>).MakeGenericType(entityType.ClrType);
 
-            var state = Activator.CreateInstance(stateType);
+            var state = Activator.CreateInstance(stateType, primaryKeyStart);
 
             var dtc = typeof(GetNextBatchDelegate<>).MakeGenericType(entityType.ClrType);
 

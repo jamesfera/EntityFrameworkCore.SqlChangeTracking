@@ -1,6 +1,4 @@
-﻿using System;
-using EntityFrameworkCore.SqlChangeTracking.Sql;
-using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Models;
+﻿using EntityFrameworkCore.SqlChangeTracking.SyncEngine.Models;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
@@ -22,19 +20,17 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
         {
             var prefix = "E";
 
-            var columnNames = ChangeTableSqlStatements.GetEntityColumnNames(entityType, prefix, prefix);
-
             var primaryKeyColumns = entityType.GetPrimaryKeyString(prefix);
 
             previousPageToken ??= 0;
 
             var discriminatorValue = entityType.GetDiscriminatorValue();
-            string discriminator = string.Empty;
+            string discriminatorClause = string.Empty;
 
             if (discriminatorValue != null)
-                discriminator = $"AND {entityType.GetDiscriminatorPropertyName()} = '{discriminatorValue}'";
+                discriminatorClause = $"AND {entityType.GetDiscriminatorPropertyName()} = '{discriminatorValue}'";
 
-            var sql = $"SELECT TOP {BatchSize} {columnNames} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} {discriminator} ORDER BY {primaryKeyColumns}";
+            var sql = $"SELECT TOP {BatchSize} {primaryKeyColumns} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} {discriminatorClause} ORDER BY {primaryKeyColumns}";
 
             return sql;
         }
