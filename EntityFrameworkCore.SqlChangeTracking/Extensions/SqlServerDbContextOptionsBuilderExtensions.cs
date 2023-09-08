@@ -20,16 +20,11 @@ namespace EntityFrameworkCore.SqlChangeTracking
             {
                 builder.ReplaceService<IMigrationsSqlGenerator, SqlChangeTrackingMigrationsSqlGenerator>();               
                 builder.ReplaceService<IRelationalAnnotationProvider, SqlChangeTrackingRelationalAnnotationProvider>();
+
                 //builder.ReplaceService<ISqlServerUpdateSqlGenerator, SqlChangeTrackingUpdateSqlGenerator>();
 
                 //builder.ReplaceService<IMigrationsModelDiffer, SqlChangeTrackingMigrationsModelDiffer>();
-                //builder.ReplaceService<ICSharpMigrationOperationGenerator, SqlChangeTrackingMigrationOperationGenerator>();
             }
-            //var extensions = builder.Options.Extensions.ToList();
-
-            //builder.AddInterceptors(new inter());
-
-            //((IDbContextOptionsBuilderInfrastructure)builder).AddOrUpdateExtension(new ChangeTrackingOptionsExtension());
 
             return sqlBuilder;
         }

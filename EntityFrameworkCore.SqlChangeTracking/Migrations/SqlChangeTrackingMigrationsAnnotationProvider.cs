@@ -16,7 +16,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
         public override IEnumerable<IAnnotation> For(ITable table, bool designTime)
         {
-            return base.For(table, designTime).Concat(table.EntityTypeMappings.First().EntityType.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
+            return base.For(table, designTime).Concat(table.EntityTypeMappings.First().GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
         }
         public SqlChangeTrackingRelationalAnnotationProvider(RelationalAnnotationProviderDependencies dependencies) : base(dependencies) { }
     }
