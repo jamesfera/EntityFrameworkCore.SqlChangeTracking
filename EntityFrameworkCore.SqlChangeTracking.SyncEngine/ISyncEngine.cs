@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore.Metadata;
+﻿using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 {
@@ -19,8 +14,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
         Task ProcessChanges(IEntityType entityType, CancellationToken cancellationToken);
         Task ProcessChanges(string entityTypeName, CancellationToken cancellationToken);
 
-        Task ProcessDataSet(IEntityType entityType, string? primaryKeyStart, CancellationToken cancellationToken);
-        Task ProcessDataSet(string entityTypeName, string? primaryKeyStart, CancellationToken cancellationToken);
+        Task ProcessDataSet(IEntityType entityType, bool markSynced, string? primaryKeyStart, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction = null);
+        Task ProcessDataSet(string entityTypeName, bool markSynced, string? primaryKeyStart, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction = null);
 
         Task SetChangeVersion(string entityName, long changeVersion);
         Task SetChangeVersion(IEntityType entityType, long changeVersion);

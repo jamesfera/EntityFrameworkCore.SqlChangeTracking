@@ -14,9 +14,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
         //    return sql;
         //}
 
-        static int BatchSize = 200;
-
-        public static string GetNextBatchExpression(IEntityType entityType, object? previousPageToken)
+        public static string GetNextBatchExpression(IEntityType entityType, object? previousPageToken, int batchSize)
         {
             var prefix = "E";
 
@@ -30,7 +28,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Sql
             if (discriminatorValue != null)
                 discriminatorClause = $"AND {entityType.GetDiscriminatorPropertyName()} = '{discriminatorValue}'";
 
-            var sql = $"SELECT TOP {BatchSize} {primaryKeyColumns} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} {discriminatorClause} ORDER BY {primaryKeyColumns}";
+            var sql = $"SELECT TOP {batchSize} {primaryKeyColumns} FROM {entityType.GetFullTableName()} AS {prefix} WHERE {primaryKeyColumns} > {previousPageToken} {discriminatorClause} ORDER BY {primaryKeyColumns}";
 
             return sql;
         }

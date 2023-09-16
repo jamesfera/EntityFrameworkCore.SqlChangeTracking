@@ -193,7 +193,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
         ConcurrentDictionary<string, bool> _entityDataSetProcessingMonitors = new ConcurrentDictionary<string, bool>();
 
-        public async Task ProcessDataSet(IEntityType entityType, string? primaryKeyStart, CancellationToken cancellationToken)
+
+
+        public async Task ProcessDataSet(IEntityType entityType, bool markSynced, string? primaryKeyStart, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction = null)
         {
             validateEntityType(entityType);
 
@@ -207,9 +209,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
                 else
                     _logger.LogInformation("Processing entire data set for Entity: {EntityType} starting above Primary Key: {PrimaryKey}", entityType.ClrType, primaryKeyStart);
 
-                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, primaryKeyStart, cancellationToken).ConfigureAwait(false);
+                await _changeSetProcessor.ProcessEntireDataSet(entityType, SyncContext, primaryKeyStart, cancellationToken, batchProcessedAction).ConfigureAwait(false);
 
                 _logger.LogInformation("Completed processing entire data set for Entity: {EntityType}", entityType.ClrType);
+
+                if (markSynced)
+                    await MarkEntityAsSynced(entityType);
+                
             }
             catch (Exception ex)
             {
@@ -222,11 +228,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
         }
 
-        public Task ProcessDataSet(string entityTypeName, string? primaryKeyStart, CancellationToken cancellationToken)
+        public Task ProcessDataSet(string entityTypeName, bool markSynced, string? primaryKeyStart, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction = null)
         {
             var entityType = validateEntityName(entityTypeName);
 
-            return ProcessDataSet(entityType, primaryKeyStart, cancellationToken);
+            return ProcessDataSet(entityType, markSynced, primaryKeyStart, cancellationToken, batchProcessedAction);
         }
 
         public async Task MarkEntityAsSynced(IEntityType entityType)
@@ -246,6 +252,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             }
 
             await dbContext.SetLastChangedVersionAsync(entityType, SyncContext, currentVersion.Value);
+
+            _logger.LogInformation("Entity Type: {EntityType} marked as Synced", entityType.Name);
         }
 
         public Task MarkEntityAsSynced(string entityName) => MarkEntityAsSynced(validateEntityName(entityName));
@@ -292,5 +300,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             if (!_syncEngineEntityTypes.Any(e => e == entityType))
                 throw new InvalidOperationException($"Entity Type: {entityType} does not have sync engine enabled.");
         }
+    }
+
+    public class DataSetBatchProcessed
+    {
+        public required object LastPrimaryKeyProcessed { get; init; }
+        public required bool ProcessingComplete { get; init; }
     }
 }

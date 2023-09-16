@@ -27,11 +27,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
             return await db.ToChangeSet<T>(sql).ToArrayAsync();
         }
 
-        public static async ValueTask<(IChangeTrackingEntry<T>[] Entries, object? PageToken)> NextDataSetHelper<T>(this DbContext db, object? previousPageToken) where T : class, new()
+        public static async ValueTask<(IChangeTrackingEntry<T>[] Entries, object? PageToken)> NextDataSetHelper<T>(this DbContext db, object? previousPageToken, int batchSize) where T : class, new()
         {
             var entityType = db.Model.FindEntityType(typeof(T));
 
-            var sql = SyncEngineSqlStatements.GetNextBatchExpression(entityType, previousPageToken);
+            var sql = SyncEngineSqlStatements.GetNextBatchExpression(entityType, previousPageToken, batchSize);
 
             var results = await db.ToChangeSet<T>(sql, false).ToArrayAsync();
 

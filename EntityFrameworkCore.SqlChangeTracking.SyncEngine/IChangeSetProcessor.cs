@@ -18,13 +18,19 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
     public class DataSetState<TEntity> where TEntity : class, new()
     {
         object _previousPageToken = null;
+        int _batchSize;
 
         public DataSetState() { }
-        public DataSetState(string? primaryKeyStart) => _previousPageToken = primaryKeyStart;
+
+        public DataSetState(string? primaryKeyStart, int batchSize)
+        {
+            _previousPageToken = primaryKeyStart;
+            _batchSize = batchSize;
+        }
 
         public async ValueTask<IChangeTrackingEntry<TEntity>[]> T1(DbContext dbContext, string syncContext)
         {
-            var result = await dbContext.NextDataSetHelper<TEntity>(_previousPageToken);
+            var result = await dbContext.NextDataSetHelper<TEntity>(_previousPageToken, _batchSize);
 
             _previousPageToken = result.PageToken;
             return result.Entries;
@@ -36,7 +42,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
     public interface IChangeSetProcessor<TContext> where TContext : DbContext
     {
         Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken);
-        Task ProcessEntireDataSet(IEntityType entityType, string syncContext, string? primaryKeyStart, CancellationToken cancellationToken);
+        Task ProcessEntireDataSet(IEntityType entityType, string syncContext, string? primaryKeyStart, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction);
     }
 
     public class ChangeSetProcessor<TContext> : IChangeSetProcessor<TContext> where TContext : DbContext
@@ -50,11 +56,11 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             _logger = logger ?? NullLogger<ChangeSetProcessor<TContext>>.Instance;
         }
 
-        public Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getNextChangeSetFunc(entityType), ChangeBatchType.Changes, cancellationToken);
+        public Task ProcessChanges(IEntityType entityType, string syncContext, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getNextChangeSetFunc(entityType), ChangeBatchType.Changes, cancellationToken, null);
 
-        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext, string? primaryKeyStart, CancellationToken cancellationToken) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType, primaryKeyStart), ChangeBatchType.DataSet, cancellationToken);
+        public Task ProcessEntireDataSet(IEntityType entityType, string syncContext, string? primaryKeyStart, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction) => ProcessInternal(entityType, syncContext, getEntireDataSetFunc(entityType, primaryKeyStart), ChangeBatchType.DataSet, cancellationToken, batchProcessedAction);
 
-        async Task ProcessInternal(IEntityType entityType, string syncContext, Delegate getNextBatchDelegate, ChangeBatchType changeBatchType, CancellationToken cancellationToken)
+        async Task ProcessInternal(IEntityType entityType, string syncContext, Delegate getNextBatchDelegate, ChangeBatchType changeBatchType, CancellationToken cancellationToken, Func<DataSetBatchProcessed, Task>? batchProcessedAction)
         {
             var processBatchMethod = GetType().GetMethod(nameof(processBatch), BindingFlags.NonPublic | BindingFlags.Instance).MakeGenericMethod(entityType.ClrType);
 
@@ -84,7 +90,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
                 //await using var t = transaction;
 
-                currentBatch = await (ValueTask<IChangeTrackingEntry[]>) processBatchMethod.Invoke(this, new[] {syncContext as object, getNextBatchDelegate, dbContext, changeSetBatchProcessorFactory, processorContext, changeBatchType, cancellationToken});
+                currentBatch = await (ValueTask<IChangeTrackingEntry[]>) processBatchMethod.Invoke(this, new[] {syncContext as object, getNextBatchDelegate, dbContext, changeSetBatchProcessorFactory, processorContext, changeBatchType, cancellationToken, batchProcessedAction });
 
                 if (processorContext.RecordCurrentVersion && currentBatch.Any())
                 {
@@ -106,7 +112,8 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             IChangeSetBatchProcessorFactory<TContext> changeSetBatchProcessorFactory, 
             ChangeSetProcessorContext<TContext> processorContext,
             ChangeBatchType changeBatchType,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            Func<DataSetBatchProcessed, Task>? batchProcessedAction
             )
         {
             var processors = changeSetBatchProcessorFactory.GetBatchProcessors<TEntity>(syncContext).ToArray();
@@ -168,6 +175,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
 
             stopwatch.Stop();
 
+            if (batchProcessedAction != null)
+                await batchProcessedAction(new DataSetBatchProcessed()
+                {
+                    LastPrimaryKeyProcessed = batch.Last().PrimaryKey,
+                    ProcessingComplete = batch.Length < DataSetBatchSize
+                }).ConfigureAwait(false);
+
             var actualProcessed = batch.Length - processorContext.Skipped;
 
             _logger.LogInformation("{ChangeEntryCount} change(s) successfully processed for Entity: {EntityName} in Table: {TableName} at Change Version: {CurrentChangeVersion} in: {Elapsed}", actualProcessed, entityType.ClrType.Name, entityType.GetFullTableName(), currentChangeVersion, stopwatch.Elapsed);
@@ -178,11 +192,13 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine
             return batch;
         }
 
+        static int DataSetBatchSize = 200;
+
         Delegate getEntireDataSetFunc(IEntityType entityType, string? primaryKeyStart)
         {
             var stateType = typeof(DataSetState<>).MakeGenericType(entityType.ClrType);
 
-            var state = Activator.CreateInstance(stateType, primaryKeyStart);
+            var state = Activator.CreateInstance(stateType, primaryKeyStart, DataSetBatchSize);
 
             var dtc = typeof(GetNextBatchDelegate<>).MakeGenericType(entityType.ClrType);
 
