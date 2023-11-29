@@ -99,7 +99,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
             }
 
             var generateMethod = typesToScan
-                .SelectMany(t => t.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
+                .SelectMany(t => t.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                 .Where(m => m.Name == nameof(Generate))
                 .FirstOrDefault(m => m.GetParameters().Select(p => p.ParameterType).Contains(operation.GetType()));
 
