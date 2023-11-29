@@ -1,23 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using EntityFrameworkCore.SqlChangeTracking.Extensions;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.SqlServer.Metadata.Internal;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 {
-    public class SqlChangeTrackingRelationalAnnotationProvider : SqlServerAnnotationProvider
+    public class SqlChangeTrackingRelationalAnnotationProvider(RelationalAnnotationProviderDependencies dependencies)
+        : SqlServerAnnotationProvider(dependencies)
     {
-        public override IEnumerable<IAnnotation> For(IRelationalModel model, bool designTime)
-        {
-            return base.For(model, designTime).Concat(model.Model.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
-        }
+        //public override IEnumerable<IAnnotation> For(IRelationalModel model, bool designTime)
+        //{
+        //    return base.For(model, designTime).Concat(model.Model.GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
+        //}
 
-        public override IEnumerable<IAnnotation> For(ITable table, bool designTime)
-        {
-            return base.For(table, designTime).Concat(table.EntityTypeMappings.First().GetAnnotations().Where(a => a.Name.StartsWith(SqlChangeTrackingAnnotationNames.Prefix)));
-        }
-        public SqlChangeTrackingRelationalAnnotationProvider(RelationalAnnotationProviderDependencies dependencies) : base(dependencies) { }
+        //public override IEnumerable<IAnnotation> For(ITable table, bool designTime)
+        //{
+        //    var annotations = base.For(table, designTime);
+
+        //    var entityType = (IEntityType)table.EntityTypeMappings.First().TypeBase;
+
+        //    if (entityType.IsChangeTrackingEnabled())
+        //        annotations = annotations.Concat(new[] { new Annotation(SqlChangeTrackingAnnotationNames.Enabled, true),
+        //            new Annotation(SqlChangeTrackingAnnotationNames.TrackColumns, entityType.ChangeTrackingTrackColumns()) });
+
+        //    return annotations;
+        //}
     }
 }

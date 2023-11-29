@@ -1,5 +1,5 @@
 ﻿using System;
-using EntityFrameworkCore.SqlChangeTracking.Extensions;
+using System.Reflection;
 using EntityFrameworkCore.SqlChangeTracking.Migrations.Operations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -28,23 +28,16 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 .EndCommand(true);
         }
 
-        void Generate(EnableSnapshotIsolationOperation operation, IModel model, MigrationCommandListBuilder builder)
+        void Generate(SnapshotIsolationOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
             var sqlHelper = Dependencies.SqlGenerationHelper;
 
             builder
                 .Append("ALTER DATABASE ")
                 .Append(sqlHelper.DelimitIdentifier(Dependencies.CurrentContext.Context.Database.GetDbConnection().Database))
-                .Append(" SET ALLOW_SNAPSHOT_ISOLATION ON")
+                .Append($" SET ALLOW_SNAPSHOT_ISOLATION {(operation.Enabled ? "ON" : "OFF")}")
                 .AppendLine(sqlHelper.StatementTerminator)
                 .EndCommand(true);
-
-            //    builder
-            //        .Append("ALTER DATABASE ")
-            //        .Append(sqlHelper.DelimitIdentifier(database))
-            //        .Append(" SET ALLOW_SNAPSHOT_ISOLATION OFF ")
-            //        .AppendLine(sqlHelper.StatementTerminator)
-            //        .EndCommand();
         }
 
         void Generate(DisableChangeTrackingForDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
@@ -63,7 +56,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
         {
             //TODO detect if operation.TrackColumns has changed and re-create?
 
-            var tableName = operation.Schema == null ? operation.Name : $"{operation.Schema}.{operation.Name}";
+            var tableName = operation.Schema == null ? operation.Table : $"{operation.Schema}.{operation.Table}";
 
             var sqlHelper = Dependencies.SqlGenerationHelper;
 
@@ -81,7 +74,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
         void Generate(DisableChangeTrackingForTableOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            var tableName = operation.Schema == null ? operation.Name : $"{operation.Schema}.{operation.Name}";
+            var tableName = operation.Schema == null ? operation.Table : $"{operation.Schema}.{operation.Table}";
 
             var sqlHelper = Dependencies.SqlGenerationHelper;
 
@@ -93,52 +86,27 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                 .EndCommand();
         }
 
-        protected override void Generate(AlterDatabaseOperation operation, IModel model, MigrationCommandListBuilder builder)
-        {
-            base.Generate(operation, model, builder);
-
-            if (operation.IsChangeTrackingEnabled())
-                Generate(new EnableChangeTrackingForDatabaseOperation(operation.ChangeTrackingRetentionDays(), operation.ChangeTrackingAutoCleanUp()), model, builder);
-            else if(operation.OldDatabase?.FindAnnotation(SqlChangeTrackingAnnotationNames.Enabled)?.Value as bool? ?? false)
-                Generate(new DisableChangeTrackingForDatabaseOperation(), model, builder);
-
-            if (operation.IsSnapshotIsolationEnabled())
-                Generate(new EnableSnapshotIsolationOperation(), model, builder);
-            //else if (operation.OldDatabase?.FindAnnotation(SqlChangeTrackingAnnotationNames.SnapshotIsolation)?.Value as bool? ?? false)
-            //    Generate(new DisableSnapshotIsolationOperation(), model, builder);
-        }
-
-        protected override void Generate(CreateTableOperation operation, IModel model, MigrationCommandListBuilder builder, bool terminate = true)
-        {
-           base.Generate(operation, model, builder);
-
-           if (operation.IsChangeTrackingEnabled())
-               Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
-        }
-
-        protected override void Generate(AlterTableOperation operation, IModel model, MigrationCommandListBuilder builder)
-        {
-            base.Generate(operation, model, builder);
-            
-            if (operation.IsChangeTrackingEnabled() && !operation.OldTable.IsChangeTrackingEnabled())
-                Generate(new EnableChangeTrackingForTableOperation(operation.Name, operation.Schema, operation.ChangeTrackingTrackColumns()), model, builder);
-            else if(!operation.IsChangeTrackingEnabled() && operation.OldTable.IsChangeTrackingEnabled())
-                Generate(new DisableChangeTrackingForTableOperation(operation.Name, operation.Schema), model, builder);
-        }
-
         protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
         {
-            Action generateAction = operation switch
-            {
-                EnableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
-                DisableChangeTrackingForDatabaseOperation op => () => Generate(op, model, builder),
-                EnableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
-                DisableChangeTrackingForTableOperation op => () => Generate(op, model, builder),
-                EnableSnapshotIsolationOperation op => () => Generate(op, model, builder),
-                _ => () => base.Generate(operation, model, builder)
-            };
+            var typesToScan = new List<Type>();
 
-            generateAction();
+            var type = GetType();
+
+            while (type != typeof(SqlServerMigrationsSqlGenerator) && type is not null)
+            {
+                typesToScan.Add(type);
+                type = type.BaseType;
+            }
+
+            var generateMethod = typesToScan
+                .SelectMany(t => t.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
+                .Where(m => m.Name == nameof(Generate))
+                .FirstOrDefault(m => m.GetParameters().Select(p => p.ParameterType).Contains(operation.GetType()));
+
+            if (generateMethod is not null)
+                generateMethod.Invoke(this, new object?[] { operation, model, builder });
+            else
+                base.Generate(operation, model, builder);
         }
     }
 }

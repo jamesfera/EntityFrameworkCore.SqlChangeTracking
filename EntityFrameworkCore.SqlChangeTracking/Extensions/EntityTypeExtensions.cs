@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 
 namespace EntityFrameworkCore.SqlChangeTracking
@@ -18,8 +12,8 @@ namespace EntityFrameworkCore.SqlChangeTracking
         public static void EnableSqlChangeTracking(this IMutableEntityType entityType)
             => entityType.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.Enabled, true);
 
-        public static bool GetTrackColumns(this IEntityType entityType)
-            => entityType[SqlChangeTrackingAnnotationNames.TrackColumns] as bool? ?? false;
+        public static bool ChangeTrackingTrackColumns(this IEntityType entityType)
+            => entityType.FindAnnotation(SqlChangeTrackingAnnotationNames.TrackColumns)?.Value as bool? ?? false;
 
         public static void SetTrackColumns(this IMutableEntityType entityType, bool enabled = false)
             => entityType.SetOrRemoveAnnotation(SqlChangeTrackingAnnotationNames.TrackColumns, enabled);

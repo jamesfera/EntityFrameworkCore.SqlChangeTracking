@@ -1,7 +1,5 @@
-﻿using System;
-using EntityFrameworkCore.SqlChangeTracking.Options;
+﻿using EntityFrameworkCore.SqlChangeTracking.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EntityFrameworkCore.SqlChangeTracking
 {

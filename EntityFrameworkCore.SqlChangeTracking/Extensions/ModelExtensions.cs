@@ -6,7 +6,7 @@ namespace EntityFrameworkCore.SqlChangeTracking
 {
     public static class ModelExtensions
     {
-        public static bool IsChangeTrackingEnabled(this IModel model)
+        public static bool IsSqlChangeTrackingEnabled(this IModel model)
             => model[SqlChangeTrackingAnnotationNames.Enabled] as bool? ?? false;
 
         public static void EnableChangeTracking(this IMutableModel model)
