@@ -11,9 +11,10 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
     public class SqlChangeTrackingMigrationsModelDiffer(
             IRelationalTypeMappingSource typeMappingSource,
             IMigrationsAnnotationProvider migrationsAnnotationProvider,
+            IRelationalAnnotationProvider relationalAnnotationProvider,
             IRowIdentityMapFactory rowIdentityMapFactory,
             CommandBatchPreparerDependencies commandBatchPreparerDependencies)
-        : MigrationsModelDiffer(typeMappingSource, migrationsAnnotationProvider, rowIdentityMapFactory, commandBatchPreparerDependencies)
+        : MigrationsModelDiffer(typeMappingSource, migrationsAnnotationProvider, relationalAnnotationProvider, rowIdentityMapFactory, commandBatchPreparerDependencies)
     {
         protected override IEnumerable<MigrationOperation> Diff(ITable source, ITable target, DiffContext diffContext)
         {

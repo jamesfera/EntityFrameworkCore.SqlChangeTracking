@@ -143,7 +143,7 @@ namespace EntityFrameworkCore.SqlChangeTracking.SyncEngine.Extensions
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             {
                 optionsBuilder.UseSqlServer(connection);
-                Database.AutoTransactionsEnabled = false;
+                Database.AutoTransactionBehavior = AutoTransactionBehavior.Never;
                 base.OnConfiguring(optionsBuilder);
             }
 
