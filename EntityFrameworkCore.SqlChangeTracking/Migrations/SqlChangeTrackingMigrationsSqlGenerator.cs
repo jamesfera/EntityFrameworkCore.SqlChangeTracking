@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
 
 namespace EntityFrameworkCore.SqlChangeTracking.Migrations
@@ -60,6 +61,9 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
             var sqlHelper = Dependencies.SqlGenerationHelper;
 
+            if (operation.Idempotent)
+                AppendChangeTrackingExistsCheck(builder, tableName, exists: false);
+
             builder
                 .Append("ALTER TABLE ")
                 .Append(sqlHelper.DelimitIdentifier(tableName))
@@ -78,12 +82,32 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
 
             var sqlHelper = Dependencies.SqlGenerationHelper;
 
+            if (operation.Idempotent)
+                AppendChangeTrackingExistsCheck(builder, tableName, exists: true);
+
             builder
                 .Append("ALTER TABLE ")
                 .Append(sqlHelper.DelimitIdentifier(tableName))
                 .Append(" DISABLE CHANGE_TRACKING")
                 .AppendLine(sqlHelper.StatementTerminator)
                 .EndCommand();
+        }
+
+        /// <summary>
+        /// Appends an IF [NOT] EXISTS check against sys.change_tracking_tables so the following statement
+        /// only runs when the table is (or is not) already change tracked.
+        /// </summary>
+        void AppendChangeTrackingExistsCheck(MigrationCommandListBuilder builder, string tableName, bool exists)
+        {
+            var sqlHelper = Dependencies.SqlGenerationHelper;
+            var stringMapping = Dependencies.TypeMappingSource.GetMapping(typeof(string));
+
+            builder
+                .Append(exists ? "IF EXISTS" : "IF NOT EXISTS")
+                .Append(" (SELECT 1 FROM sys.change_tracking_tables WHERE object_id = OBJECT_ID(")
+                .Append(stringMapping.GenerateSqlLiteral(sqlHelper.DelimitIdentifier(tableName)))
+                .AppendLine("))")
+                .Append("    ");
         }
 
         protected override void Generate(MigrationOperation operation, IModel model, MigrationCommandListBuilder builder)
