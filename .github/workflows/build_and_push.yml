@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3.5.0
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -20,22 +20,16 @@ jobs:
           dotnet tool restore
           dotnet gitversion /output buildserver
 
-      - name: Install NuGet client
-        uses: nuget/setup-nuget@v1
-        with:
-          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
-          nuget-version: '5.4'
-
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
-            8.x    
+            8.x
 
       - name: Build with dotnet
         run: |
-          nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }} -StorePasswordInClearText
-          dotnet tool install -g dotnet-setversion
+          dotnet nuget add source https://nuget.pkg.github.com/jamesfera/index.json --name GPR --username jamesfera --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text
+          dotnet tool install -g dotnet-setversion --version 4.0.0
           setversion -r ${{env.GitVersion_FullSemVer}}
           dotnet build --configuration Release
 
@@ -56,7 +50,7 @@ jobs:
 
       - name: Push to GitHub NuGet
         run: |
-          nuget push **/*.nupkg -Source "GPR" -ApiKey ${{ secrets.GITHUB_TOKEN }}
-          nuget push **/*.snupkg -Source "GPR" -ApiKey ${{ secrets.GITHUB_TOKEN }}
+          dotnet nuget push "*.nupkg" --source GPR --api-key ${{ secrets.GITHUB_TOKEN }}
+          dotnet nuget push "*.snupkg" --source GPR --api-key ${{ secrets.GITHUB_TOKEN }}
 
       
