@@ -2,7 +2,6 @@
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
-using EntityFrameworkCore.SqlChangeTracking.AsyncLinqExtensions;
 using EntityFrameworkCore.SqlChangeTracking.Extensions.Internal;
 using EntityFrameworkCore.SqlChangeTracking.Models;
 using EntityFrameworkCore.SqlChangeTracking.Sql;

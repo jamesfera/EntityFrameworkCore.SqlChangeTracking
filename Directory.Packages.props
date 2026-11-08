@@ -1,0 +1,18 @@
+<Project>
+	<!-- Central Package Management: https://learn.microsoft.com/nuget/consume-packages/central-package-management -->
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageVersion Include="coverlet.collector" Version="1.2.0" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="5.0.0-preview.4.20220.10" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Relational.Specification.Tests" Version="5.0.0-preview.4.20220.10" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+		<PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+		<PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+		<PackageVersion Include="xunit" Version="2.4.1" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="2.4.1" />
+	</ItemGroup>
+</Project>
