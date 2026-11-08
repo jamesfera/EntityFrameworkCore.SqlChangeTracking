@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3.5.0
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -21,21 +21,22 @@ jobs:
           dotnet gitversion /output buildserver
 
       - name: Install NuGet client
-        uses: nuget/setup-nuget@v1
+        uses: nuget/setup-nuget@v4
         with:
           nuget-api-key: ${{ secrets.NUGET_API_KEY }}
-          nuget-version: '5.4'
+          nuget-version: 'latest'
 
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
-            8.x    
+            11.x
+          dotnet-quality: preview
 
       - name: Build with dotnet
         run: |
           nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/jamesfera/index.json -Username jamesfera -Password ${{ secrets.GITHUB_TOKEN }} -StorePasswordInClearText
-          dotnet tool install -g dotnet-setversion
+          dotnet tool install -g dotnet-setversion --version 4.0.0
           setversion -r ${{env.GitVersion_FullSemVer}}
           dotnet build --configuration Release
 

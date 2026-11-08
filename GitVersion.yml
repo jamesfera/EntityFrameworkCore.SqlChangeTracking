@@ -1,1 +1,2 @@
-mode: Mainline
+strategies:
+  - Mainline

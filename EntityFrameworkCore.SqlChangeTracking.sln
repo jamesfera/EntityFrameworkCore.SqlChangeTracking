@@ -9,6 +9,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EntityFrameworkCore.SqlChan
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{79A23695-C383-44B1-A2DA-B40F6F1AF1EC}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{3B7A1D52-6C0E-4F8A-9D41-8E2B5C7F1A90}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build_and_push.yml = .github\workflows\build_and_push.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
