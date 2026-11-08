@@ -62,6 +62,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                         .Append(Code.Literal(operation.TrackColumns));
                 }
 
+                if (operation.Idempotent)
+                {
+                    builder
+                        .AppendLine(",")
+                        .Append("idempotent: ")
+                        .Append(Code.Literal(operation.Idempotent));
+                }
+
                 builder.Append(")");
             }
         }
@@ -82,6 +90,14 @@ namespace EntityFrameworkCore.SqlChangeTracking.Migrations
                         .AppendLine(",")
                         .Append("schema: ")
                         .Append(Code.Literal(operation.Schema));
+                }
+
+                if (operation.Idempotent)
+                {
+                    builder
+                        .AppendLine(",")
+                        .Append("idempotent: ")
+                        .Append(Code.Literal(operation.Idempotent));
                 }
 
                 builder.Append(")");
